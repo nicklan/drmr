@@ -1,0 +1,5 @@
+@prefix lv2:  <http://lv2plug.in/ns/lv2core#>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+<http://github.com/nicklan/drmr>
+  a lv2:Plugin;
+  rdfs:seeAlso <drmr.ttl>.
