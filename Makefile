@@ -1,5 +1,5 @@
 BUNDLE = lv2pftci-drmr.lv2
-INSTALL_DIR = /home/nick/.lv2
+INSTALL_DIR = /usr/local/lib/lv2
 CC=gcc
 
 $(BUNDLE): manifest.ttl drmr.ttl drmr.so
