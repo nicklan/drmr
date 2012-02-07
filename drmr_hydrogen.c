@@ -249,6 +249,13 @@ kits* scan_kits() {
   return ret;
 }
 
+static void free_samples(drmr_sample* samples, int num_samples) {
+  int i;
+  for (i=0;i<num_samples;i++)
+    free(samples[i].data);
+  free(samples);
+}
+
 int load_hydrogen_kit(DrMr* drmr, char* path) {
   char* fp_buf;
   FILE* file;
@@ -292,9 +299,9 @@ int load_hydrogen_kit(DrMr* drmr, char* path) {
   XML_ParserFree(parser);
 
   {
-    drmr_sample* samples;
+    drmr_sample *samples, *old_samples;
     struct instrument_info * cur_i;
-    int i = 0, num_inst = 0;
+    int i = 0, num_inst = 0, old_scount;
     printf("Read kit: %s\n",kit_info.name);
     cur_i = kit_info.instruments;
     while(cur_i) { // first count how many samples we have
@@ -314,6 +321,8 @@ int load_hydrogen_kit(DrMr* drmr, char* path) {
       i++;
       cur_i = cur_i->next;
     }
+    old_samples = drmr->samples;
+    old_scount = drmr->num_samples;
     if (num_inst > drmr->num_samples) { 
       // we have more, so we can safely swap our sample list in before updating num_samples
       drmr->samples = samples;
@@ -323,6 +332,7 @@ int load_hydrogen_kit(DrMr* drmr, char* path) {
       drmr->num_samples = num_inst;
       drmr->samples = samples;
     }
+    if (old_samples) free_samples(old_samples,old_scount);
   }
   return 0;
   

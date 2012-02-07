@@ -19,11 +19,13 @@
 #ifndef DRMR_H
 #define DRMR_H
 
+#include <sndfile.h>
+#include <pthread.h>
+
 #include "lv2/lv2plug.in/ns/lv2core/lv2.h"
 #include "lv2/lv2plug.in/ns/ext/event/event.h"
 #include "lv2/lv2plug.in/ns/ext/event/event-helpers.h"
 #include "lv2/lv2plug.in/ns/ext/uri-map/uri-map.h"
-#include <sndfile.h>
 
 // drumkit scanned from a hydrogen xml file
 typedef struct {
@@ -57,6 +59,7 @@ typedef enum {
   DRMR_MIDI = 0,
   DRMR_LEFT,
   DRMR_RIGHT,
+  DRMR_KITNUM,
   DRMR_GAIN_ONE,
   DRMR_GAIN_TWO,
   DRMR_GAIN_THREE,
@@ -84,7 +87,7 @@ typedef struct {
 
   // params
   float** gains;
-
+  float* kitReq;
 
   // URIs
   LV2_URI_Map_Feature* map;
@@ -94,10 +97,16 @@ typedef struct {
 
   // Available kits
   kits* kits;
+  int curKit;
 
   // Samples
   drmr_sample* samples;
   uint8_t num_samples;
+
+  // loading thread stuff
+  pthread_mutex_t load_mutex;
+  pthread_cond_t  load_cond;
+  pthread_t load_thread;
 
 } DrMr;
 

@@ -39,6 +39,17 @@
   [
     a lv2:ControlPort, lv2:InputPort;
     lv2:index 3;
+    lv2:symbol "kit_num";
+    lv2:name "Kit Index";
+    lv2:minimum 0;
+    lv2:maximum 50;
+    lv2:default 0;
+    lv2:portProperty lv2:integer;
+  ],
+
+  [
+    a lv2:ControlPort, lv2:InputPort;
+    lv2:index 4;
     lv2:symbol "gain_one";
     lv2:name "Sample One Gain";
     lv2:minimum 0.0;
@@ -48,7 +59,7 @@
 
   [
     a lv2:ControlPort, lv2:InputPort;
-    lv2:index 4;
+    lv2:index 5;
     lv2:symbol "gain_two";
     lv2:name "Sample Two Gain";
     lv2:minimum 0.0;
@@ -58,7 +69,7 @@
 
   [
     a lv2:ControlPort, lv2:InputPort;
-    lv2:index 5;
+    lv2:index 6;
     lv2:symbol "gain_three";
     lv2:name "Sample Three Gain";
     lv2:minimum 0.0;
@@ -68,7 +79,7 @@
 
   [
     a lv2:ControlPort, lv2:InputPort;
-    lv2:index 6;
+    lv2:index 7;
     lv2:symbol "gain_four";
     lv2:name "Sample Four Gain";
     lv2:minimum 0.0;
@@ -78,7 +89,7 @@
 
   [
     a lv2:ControlPort, lv2:InputPort;
-    lv2:index 7;
+    lv2:index 8;
     lv2:symbol "gain_five";
     lv2:name "Sample Five Gain";
     lv2:minimum 0.0;
@@ -88,7 +99,7 @@
 
   [
     a lv2:ControlPort, lv2:InputPort;
-    lv2:index 8;
+    lv2:index 9;
     lv2:symbol "gain_siz";
     lv2:name "Sample Siz Gain";
     lv2:minimum 0.0;
@@ -98,7 +109,7 @@
 
   [
     a lv2:ControlPort, lv2:InputPort;
-    lv2:index 9;
+    lv2:index 10;
     lv2:symbol "gain_seven";
     lv2:name "Sample Seven Gain";
     lv2:minimum 0.0;
@@ -108,7 +119,7 @@
 
   [
     a lv2:ControlPort, lv2:InputPort;
-    lv2:index 10;
+    lv2:index 11;
     lv2:symbol "gain_eight";
     lv2:name "Sample Eight Gain";
     lv2:minimum 0.0;
@@ -118,7 +129,7 @@
 
   [
     a lv2:ControlPort, lv2:InputPort;
-    lv2:index 11;
+    lv2:index 12;
     lv2:symbol "gain_nine";
     lv2:name "Sample Nine Gain";
     lv2:minimum 0.0;
@@ -128,7 +139,7 @@
 
   [
     a lv2:ControlPort, lv2:InputPort;
-    lv2:index 12;
+    lv2:index 13;
     lv2:symbol "gain_ten";
     lv2:name "Sample Ten Gain";
     lv2:minimum 0.0;
@@ -138,7 +149,7 @@
 
   [
     a lv2:ControlPort, lv2:InputPort;
-    lv2:index 13;
+    lv2:index 14;
     lv2:symbol "gain_eleven";
     lv2:name "Sample Eleven Gain";
     lv2:minimum 0.0;
@@ -148,7 +159,7 @@
 
   [
     a lv2:ControlPort, lv2:InputPort;
-    lv2:index 14;
+    lv2:index 15;
     lv2:symbol "gain_twelve";
     lv2:name "Sample Twelve Gain";
     lv2:minimum 0.0;
@@ -158,7 +169,7 @@
 
   [
     a lv2:ControlPort, lv2:InputPort;
-    lv2:index 15;
+    lv2:index 16;
     lv2:symbol "gain_thirteen";
     lv2:name "Sample Thirteen Gain";
     lv2:minimum 0.0;
@@ -168,7 +179,7 @@
 
   [
     a lv2:ControlPort, lv2:InputPort;
-    lv2:index 16;
+    lv2:index 17;
     lv2:symbol "gain_fourteen";
     lv2:name "Sample Fourteen Gain";
     lv2:minimum 0.0;
@@ -178,7 +189,7 @@
 
   [
     a lv2:ControlPort, lv2:InputPort;
-    lv2:index 17;
+    lv2:index 18;
     lv2:symbol "gain_fifteen";
     lv2:name "Sample Fifteen Gain";
     lv2:minimum 0.0;
@@ -188,7 +199,7 @@
 
   [
     a lv2:ControlPort, lv2:InputPort;
-    lv2:index 18;
+    lv2:index 19;
     lv2:symbol "gain_sixteen";
     lv2:name "Sample Sixteen Gain";
     lv2:minimum 0.0;

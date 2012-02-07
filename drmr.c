@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "drmr.h"
 #include "drmr_hydrogen.h"
@@ -55,6 +56,19 @@ int load_sample(char* path, drmr_sample* samp) {
   return 0;
 }
 
+static void* load_thread(void* arg) {
+  DrMr* drmr = (DrMr*)arg;
+
+  pthread_mutex_lock(&drmr->load_mutex);
+  for(;;) {
+    pthread_cond_wait(&drmr->load_cond,
+		      &drmr->load_mutex);
+    load_hydrogen_kit(drmr,drmr->kits->kits[drmr->curKit].path);
+  }
+  pthread_mutex_unlock(&drmr->load_mutex);
+  return 0;
+}
+
 static LV2_Handle
 instantiate(const LV2_Descriptor*     descriptor,
             double                    rate,
@@ -64,6 +78,22 @@ instantiate(const LV2_Descriptor*     descriptor,
   DrMr* drmr = malloc(sizeof(DrMr));
   drmr->map = NULL;
   drmr->num_samples = 0;
+
+  if (pthread_mutex_init(&drmr->load_mutex, 0)) {
+    fprintf(stderr, "Could not initialize load_mutex.\n");
+    free(drmr);
+    return 0;
+  }
+  if (pthread_cond_init(&drmr->load_cond, 0)) {
+    fprintf(stderr, "Could not initialize load_cond.\n");
+    free(drmr);
+    return 0;
+  }
+  if (pthread_create(&drmr->load_thread, 0, load_thread, drmr)) {
+    fprintf(stderr, "Could not initialize loading thread.\n");
+    free(drmr);
+    return 0;
+  }
 
   // Map midi uri
   while(*features) {
@@ -89,12 +119,10 @@ instantiate(const LV2_Descriptor*     descriptor,
     return 0;
   }
   load_hydrogen_kit(drmr,drmr->kits->kits->path);
+  drmr->curKit = 0;
 
   drmr->gains = malloc(16*sizeof(float*));
   for(i = 0;i<16;i++) drmr->gains[i] = NULL;
-
-
-  //load_hydrogen_kit(drmr,"/usr/share/hydrogen/data/drumkits/3355606kit/");
 
   return (LV2_Handle)drmr;
 }
@@ -113,6 +141,10 @@ connect_port(LV2_Handle instance,
     break;
   case DRMR_RIGHT:
     drmr->right = (float*)data;
+    break;
+  case DRMR_KITNUM:
+    if(data) drmr->kitReq = (float*)data;
+    printf("Connected kit\n");
     break;
   case DRMR_GAIN_ONE:
     if (data) drmr->gains[0] = (float*)data;
@@ -171,9 +203,15 @@ static void activate(LV2_Handle instance) { }
 
 
 static void run(LV2_Handle instance, uint32_t n_samples) {
-  int i;
+  int i,kitInt;
   char first_active, one_active;
   DrMr* drmr = (DrMr*)instance;
+
+  kitInt = (int)floorf(*(drmr->kitReq));
+  if (kitInt != drmr->curKit) { // requested a new kit
+    drmr->curKit = kitInt;
+    pthread_cond_signal(&drmr->load_cond);
+  }
 
   LV2_Event_Iterator eit;
   if (lv2_event_begin(&eit,drmr->midi_port)) { // if we have any events
