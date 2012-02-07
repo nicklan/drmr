@@ -67,6 +67,7 @@ static void* load_thread(void* arg) {
       int os = drmr->num_samples;
       drmr->num_samples = 0;
       if (os > 0) free_samples(drmr->samples,os);
+      drmr->samples = NULL;
     } else
       load_hydrogen_kit(drmr,drmr->kits->kits[request].path);
     drmr->curKit = request;
