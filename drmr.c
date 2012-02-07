@@ -62,12 +62,14 @@ static void* load_thread(void* arg) {
   for(;;) {
     pthread_cond_wait(&drmr->load_cond,
 		      &drmr->load_mutex);
-    if (drmr->curKit >= drmr->kits->num_kits) {
+    int request = (int)floorf(*(drmr->kitReq));
+    if (request >= drmr->kits->num_kits) {
       int os = drmr->num_samples;
       drmr->num_samples = 0;
       if (os > 0) free_samples(drmr->samples,os);
     } else
-      load_hydrogen_kit(drmr,drmr->kits->kits[drmr->curKit].path);
+      load_hydrogen_kit(drmr,drmr->kits->kits[request].path);
+    drmr->curKit = request;
   }
   pthread_mutex_unlock(&drmr->load_mutex);
   return 0;
@@ -212,10 +214,8 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
   DrMr* drmr = (DrMr*)instance;
 
   kitInt = (int)floorf(*(drmr->kitReq));
-  if (kitInt != drmr->curKit) { // requested a new kit
-    drmr->curKit = kitInt;
+  if (kitInt != drmr->curKit) // requested a new kit
     pthread_cond_signal(&drmr->load_cond);
-  }
 
   LV2_Event_Iterator eit;
   if (lv2_event_begin(&eit,drmr->midi_port)) { // if we have any events
@@ -232,10 +232,14 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	case 9: {
 	  uint8_t nn = data[1];
 	  nn-=60; // middle c is our root note (setting?)
+	  // need to mutex this to avoid getting the samples array
+	  // changed after the check that the midi-note is valid
+	  pthread_mutex_lock(&drmr->load_mutex); 
 	  if (nn >= 0 && nn < drmr->num_samples) {
 	    drmr->samples[nn].active = 1;
 	    drmr->samples[nn].offset = 0;
 	  }
+	  pthread_mutex_unlock(&drmr->load_mutex);
 	  break;
 	}
 	default:
@@ -247,6 +251,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
   }
 
   first_active = 1;
+  pthread_mutex_lock(&drmr->load_mutex); 
   for (i = 0;i < drmr->num_samples;i++) {
     int pos,lim;
     drmr_sample* cs = drmr->samples+i;
@@ -292,6 +297,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
       if (cs->offset >= cs->limit) cs->active = 0;
     }
   }
+  pthread_mutex_unlock(&drmr->load_mutex); 
   if (first_active) { // didn't find any samples
     int pos;
     for(pos = 0;pos<n_samples;pos++) {

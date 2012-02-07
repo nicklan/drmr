@@ -253,7 +253,8 @@ kits* scan_kits() {
 void free_samples(drmr_sample* samples, int num_samples) {
   int i;
   for (i=0;i<num_samples;i++)
-    free(samples[i].data);
+    if (samples[i].data)
+      free(samples[i].data);
   free(samples);
 }
 
@@ -316,8 +317,10 @@ int load_hydrogen_kit(DrMr* drmr, char* path) {
       snprintf(buf,BUFSIZ,"%s/%s",path,cur_i->filename);
       if (load_sample(buf,samples+i)) {
 	fprintf(stderr,"Could not load sample: %s\n",buf);
-	// TODO: Memory leak on previously loaded samples
-	return 1;
+	samples[i].offset = 0;
+	// set limit to zero, will never try and play
+	samples[i].limit = 0; 
+	samples[i].data = NULL;
       }
       i++;
       cur_i = cur_i->next;
