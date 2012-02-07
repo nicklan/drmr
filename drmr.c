@@ -111,7 +111,7 @@ instantiate(const LV2_Descriptor*     descriptor,
     features++;
   }
   if (!drmr->map) {
-    fprintf(stderr, "LV2 host does not support urid:map.\n");
+    fprintf(stderr, "LV2 host does not support uri-map.\n");
     free(drmr);
     return 0;
   }
@@ -149,7 +149,6 @@ connect_port(LV2_Handle instance,
     break;
   case DRMR_KITNUM:
     if(data) drmr->kitReq = (float*)data;
-    printf("Connected kit\n");
     break;
   case DRMR_GAIN_ONE:
     if (data) drmr->gains[0] = (float*)data;
