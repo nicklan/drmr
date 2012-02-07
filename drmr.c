@@ -289,6 +289,12 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 static void deactivate(LV2_Handle instance) {}
 
 static void cleanup(LV2_Handle instance) {
+  DrMr* drmr = (DrMr*)instance;
+  pthread_cancel(drmr->load_thread);
+  pthread_join(drmr->load_thread, 0);
+  if (drmr->num_samples > 0)
+    free_samples(drmr->samples,drmr->num_samples);
+  free(drmr->gains);
   free(instance);
 }
 
