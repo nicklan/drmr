@@ -211,7 +211,6 @@ static void activate(LV2_Handle instance) { }
 
 static void run(LV2_Handle instance, uint32_t n_samples) {
   int i,kitInt;
-  char first_active, one_active;
   DrMr* drmr = (DrMr*)instance;
 
   kitInt = (int)floorf(*(drmr->kitReq));
@@ -251,7 +250,11 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
     } 
   }
 
-  first_active = 1;
+  for(i = 0;i<n_samples;i++) {
+    drmr->left[i] = 0.0f;
+    drmr->right[i] = 0.0f;
+  }
+
   pthread_mutex_lock(&drmr->load_mutex); 
   for (i = 0;i < drmr->num_samples;i++) {
     int pos,lim;
@@ -262,50 +265,25 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	gain = *(drmr->gains[i]);
       else
 	gain = 1.0f;
-      one_active = 1;
       if (cs->info.channels == 1) { // play mono sample
 	lim = (n_samples < (cs->limit - cs->offset)?n_samples:(cs->limit-cs->offset));
-	if (first_active) {
-	  for(pos = 0;pos < lim;pos++) {
-	    drmr->left[pos]  = cs->data[cs->offset]*gain;
-	    drmr->right[pos] = cs->data[cs->offset]*gain;
-	    cs->offset++;
-	  }
-	  first_active = 0;
-	} else {
-	  for(pos = 0;pos < lim;pos++) {
-	    drmr->left[pos]  += cs->data[cs->offset]*gain;
-	    drmr->right[pos] += cs->data[cs->offset]*gain;
-	    cs->offset++;
-	  }
+	for(pos = 0;pos < lim;pos++) {
+	  drmr->left[pos]  += cs->data[cs->offset]*gain;
+	  drmr->right[pos] += cs->data[cs->offset]*gain;
+	  cs->offset++;
 	}
       } else { // play stereo sample
 	lim = (cs->limit-cs->offset)/cs->info.channels;
 	if (lim > n_samples) lim = n_samples;
-	if (first_active) {
-	  for (pos=0;pos<lim;pos++) {
-	    drmr->left[pos]  = cs->data[cs->offset++]*gain;
-	    drmr->right[pos] = cs->data[cs->offset++]*gain;
-	  }
-	  first_active = 0;
-	} else {
-	  for (pos=0;pos<lim;pos++) {
-	    drmr->left[pos]  += cs->data[cs->offset++]*gain;
-	    drmr->right[pos] += cs->data[cs->offset++]*gain;
-	  }
+	for (pos=0;pos<lim;pos++) {
+	  drmr->left[pos]  += cs->data[cs->offset++]*gain;
+	  drmr->right[pos] += cs->data[cs->offset++]*gain;
 	}
       }
       if (cs->offset >= cs->limit) cs->active = 0;
     }
   }
   pthread_mutex_unlock(&drmr->load_mutex); 
-  if (first_active) { // didn't find any samples
-    int pos;
-    for(pos = 0;pos<n_samples;pos++) {
-      drmr->left[pos] = 0.0f;
-      drmr->right[pos] = 0.0f;
-    }
-  }
 }
 
 static void deactivate(LV2_Handle instance) {}
