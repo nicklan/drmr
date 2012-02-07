@@ -112,8 +112,10 @@ endElement(void *userData, const char *name)
 
   info->cur_off = 0;
 
-  if (!info->scan_only && info->in_instrument && !strcmp(name,"instrument")) {
-    // ending an instrument, add current struct to end of list
+  if (!info->scan_only && 
+      info->in_instrument && 
+      !strcmp(name,"instrument") && 
+      info->cur_instrument->filename) {
     struct instrument_info * cur_i = info->kit_info->instruments;
     if (cur_i) {
       while(cur_i->next) cur_i = cur_i->next;
@@ -249,7 +251,7 @@ kits* scan_kits() {
   return ret;
 }
 
-static void free_samples(drmr_sample* samples, int num_samples) {
+void free_samples(drmr_sample* samples, int num_samples) {
   int i;
   for (i=0;i<num_samples;i++)
     free(samples[i].data);

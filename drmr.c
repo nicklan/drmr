@@ -35,7 +35,7 @@ int load_sample(char* path, drmr_sample* samp) {
   sndf = sf_open(path,SFM_READ,&(samp->info));
   
   if (!sndf) {
-    fprintf(stderr,"Failed to open sound file: %s\n",sf_strerror(sndf));
+    fprintf(stderr,"Failed to open sound file: %s - %s\n",path,sf_strerror(sndf));
     return 1;
   }
 
@@ -63,7 +63,12 @@ static void* load_thread(void* arg) {
   for(;;) {
     pthread_cond_wait(&drmr->load_cond,
 		      &drmr->load_mutex);
-    load_hydrogen_kit(drmr,drmr->kits->kits[drmr->curKit].path);
+    if (drmr->curKit >= drmr->kits->num_kits) {
+      int os = drmr->num_samples;
+      drmr->num_samples = 0;
+      if (os > 0) free_samples(drmr->samples,os);
+    } else
+      load_hydrogen_kit(drmr,drmr->kits->kits[drmr->curKit].path);
   }
   pthread_mutex_unlock(&drmr->load_mutex);
   return 0;
@@ -118,6 +123,7 @@ instantiate(const LV2_Descriptor*     descriptor,
     free(drmr);
     return 0;
   }
+  drmr->samples = NULL; // prevent attempted freeing in load
   load_hydrogen_kit(drmr,drmr->kits->kits->path);
   drmr->curKit = 0;
 
@@ -247,7 +253,11 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
     int pos,lim;
     drmr_sample* cs = drmr->samples+i;
     if (cs->active) {
-      float gain = *(drmr->gains[i]);
+      float gain;
+      if (i < 16)
+	gain = *(drmr->gains[i]);
+      else
+	gain = 1.0f;
       one_active = 1;
       if (cs->info.channels == 1) { // play mono sample
 	lim = (n_samples < (cs->limit - cs->offset)?n_samples:(cs->limit-cs->offset));
