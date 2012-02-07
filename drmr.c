@@ -20,6 +20,7 @@
 #include <string.h>
 
 #include "drmr.h"
+#include "drmr_hydrogen.h"
 
 int load_sample(char* path, drmr_sample* samp) {
   SNDFILE* sndf;
@@ -80,11 +81,19 @@ instantiate(const LV2_Descriptor*     descriptor,
     free(drmr);
     return 0;
   }
+  
+  drmr->kits = scan_kits();
+  if (!drmr->kits) {
+    fprintf(stderr, "No drum kits found\n");
+    free(drmr);
+    return 0;
+  }
+  load_hydrogen_kit(drmr,drmr->kits->kits->path);
 
   drmr->gains = malloc(16*sizeof(float*));
   for(i = 0;i<16;i++) drmr->gains[i] = NULL;
 
-  load_hydrogen_kit(drmr,"/usr/share/hydrogen/data/drumkits/GMkit/");
+
   //load_hydrogen_kit(drmr,"/usr/share/hydrogen/data/drumkits/3355606kit/");
 
   return (LV2_Handle)drmr;

@@ -20,11 +20,20 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <errno.h>
 
 #include "drmr.h"
 #include "drmr_hydrogen.h"
 #include "expat.h"
 
+static char* default_drumkit_locations[] = {
+  "/usr/share/hydrogen/data/drumkits/",
+  "/usr/local/share/hydrogen/data/drumkits/",
+  "~/.hydrogen/data/drumkits/",
+  NULL
+};
 
 #define MAX_CHAR_DATA 512
 
@@ -44,6 +53,7 @@ struct kit_info {
 };
 
 struct hp_info {
+  char scan_only;
   char in_info;
   char in_instrument_list;
   char in_instrument;
@@ -63,8 +73,10 @@ startElement(void *userData, const char *name, const char **atts)
     if (info->in_instrument_list) {
       if (!strcmp(name,"instrument")) {
 	info->in_instrument = 1;
-	info->cur_instrument = malloc(sizeof(struct instrument_info));
-	memset(info->cur_instrument,0,sizeof(struct instrument_info));
+	if (!info->scan_only) {
+	  info->cur_instrument = malloc(sizeof(struct instrument_info));
+	  memset(info->cur_instrument,0,sizeof(struct instrument_info));
+	}
       }
     } else {
       if (!strcmp(name,"instrumentList"))
@@ -80,12 +92,15 @@ static void XMLCALL
 endElement(void *userData, const char *name)
 {
   struct hp_info* info = (struct hp_info*)userData;
+  if (info->cur_off == MAX_CHAR_DATA) info->cur_off--;
   info->cur_buf[info->cur_off]='\0';
 
   if (info->in_info && !info->in_instrument_list && !strcmp(name,"name"))
     info->kit_info->name = strdup(info->cur_buf);
+  if (info->scan_only && info->in_info && !info->in_instrument_list && !strcmp(name,"info"))
+    info->kit_info->desc = strdup(info->cur_buf);
 
-  if (info->in_instrument) {
+  if (!info->scan_only && info->in_instrument) {
     if (!strcmp(name,"id"))
       info->cur_instrument->id = atoi(info->cur_buf);
     if (!strcmp(name,"filename"))
@@ -97,7 +112,7 @@ endElement(void *userData, const char *name)
 
   info->cur_off = 0;
 
-  if (info->in_instrument && !strcmp(name,"instrument")) {
+  if (!info->scan_only && info->in_instrument && !strcmp(name,"instrument")) {
     // ending an instrument, add current struct to end of list
     struct instrument_info * cur_i = info->kit_info->instruments;
     if (cur_i) {
@@ -118,15 +133,121 @@ charData(void *userData,
 	 int len) {
   int i;
   struct hp_info* info = (struct hp_info*)userData;
+  if (!info->in_info) return;
   for(i = 0;i<len;i++) {
     if (info->cur_off < MAX_CHAR_DATA) {
       info->cur_buf[info->cur_off] = data[i];
       info->cur_off++;
-    } else
-      fprintf(stderr,"Warning, losing data because too much\n");
+    }
   }
 }
 
+struct kit_list {
+  scanned_kit* skit;
+  struct kit_list* next;
+};
+
+kits* scan_kits() {
+  DIR* dp;
+  FILE* file;
+  XML_Parser parser;
+  int done;
+  struct hp_info info;
+  struct kit_info kit_info;
+  struct dirent *ep;
+  int cp = 0;
+  char* cur_path = default_drumkit_locations[cp++];
+  kits* ret = malloc(sizeof(kits));
+  struct kit_list* scanned_kits = NULL,*cur_kit;
+  char buf[BUFSIZ];
+
+  ret->num_kits = 0;
+
+  while (cur_path) {
+    dp = opendir (cur_path);
+    if (dp != NULL) {
+      while (ep = readdir (dp)) {
+	if (ep->d_name[0]=='.') continue;
+	if (snprintf(buf,BUFSIZ,"%s/%s/drumkit.xml",cur_path,ep->d_name) >= BUFSIZ) {
+	  fprintf(stderr,"Warning: Skipping scan of %s as path name is too long\n",cur_path);
+	  continue;
+	}
+	file = fopen(buf,"r");
+	if (!file) continue; // couldn't open file
+	parser = XML_ParserCreate(NULL);
+	memset(&info,0,sizeof(struct hp_info));
+	memset(&kit_info,0,sizeof(struct kit_info));
+	info.kit_info = &kit_info;
+	info.scan_only = 1;
+	XML_SetUserData(parser, &info);
+	XML_SetElementHandler(parser, startElement, endElement);  
+	XML_SetCharacterDataHandler(parser, charData);
+	do {
+	  int len = (int)fread(buf, 1, sizeof(buf), file);
+	  done = len < sizeof(buf);
+	  if (XML_Parse(parser, buf, len, done) == XML_STATUS_ERROR) {
+	    fprintf(stderr,
+		    "%s at line %lu\n",
+		    XML_ErrorString(XML_GetErrorCode(parser)),
+		    XML_GetCurrentLineNumber(parser));
+	    break;
+	  }
+	} while (!done);
+	XML_ParserFree(parser);
+	if (info.kit_info->name) {
+	  scanned_kit* kit = malloc(sizeof(scanned_kit));
+	  struct kit_list* node = malloc(sizeof(struct kit_list));
+	  memset(kit,0,sizeof(scanned_kit));
+	  memset(node,0,sizeof(struct kit_list));
+	  kit->name = info.kit_info->name;
+	  kit->desc = info.kit_info->desc;
+	  snprintf(buf,BUFSIZ,"%s/%s/",cur_path,ep->d_name);
+	  kit->path = strdup(buf);
+	  node->skit = kit;
+	  struct kit_list * cur_k = scanned_kits;
+	  if (cur_k) {
+	    while(cur_k->next) cur_k = cur_k->next;
+	    cur_k->next = node;
+	  } else
+	    scanned_kits = node;
+	}
+      }
+      (void) closedir (dp);
+    }
+    else
+      fprintf(stderr,"Couldn't open %s: %s\n",cur_path,strerror(errno));
+    cur_path = default_drumkit_locations[cp++];
+  }
+
+  // valid kits are in scanned_kits at this point
+  cp = 0;
+  struct kit_list * cur_k = scanned_kits;
+  while(cur_k) {
+    //printf("found kit: %s\nat:%s\n\n",cur_k->skit->name,cur_k->skit->path);
+    cur_k = cur_k->next;
+    cp++;
+  }
+
+  printf("found %i kits\n",cp);
+  ret->num_kits = cp;
+  ret->kits = malloc(cp*sizeof(scanned_kit));
+
+  cur_k = scanned_kits;
+  cp = 0;
+  while(cur_k) {
+    ret->kits[cp].name = cur_k->skit->name;
+    ret->kits[cp].desc = cur_k->skit->desc;
+    ret->kits[cp].path = cur_k->skit->path;
+    cp++;
+    free(cur_k->skit);
+    cur_k = cur_k->next;
+    // free each node as we go along
+    free(scanned_kits);
+    scanned_kits = cur_k;
+  }
+
+  return ret;
+}
 
 int load_hydrogen_kit(DrMr* drmr, char* path) {
   char* fp_buf;

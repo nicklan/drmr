@@ -25,6 +25,18 @@
 #include "lv2/lv2plug.in/ns/ext/uri-map/uri-map.h"
 #include <sndfile.h>
 
+// drumkit scanned from a hydrogen xml file
+typedef struct {
+  char* name;
+  char* desc;
+  char* path;
+} scanned_kit;
+
+typedef struct {
+  int num_kits;
+  scanned_kit* kits;
+} kits;
+
 // libsndfile stuff
 
 typedef struct {
@@ -79,6 +91,9 @@ typedef struct {
   struct {
     uint32_t midi_event;
   } uris;
+
+  // Available kits
+  kits* kits;
 
   // Samples
   drmr_sample* samples;
