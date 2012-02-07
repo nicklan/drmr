@@ -47,8 +47,6 @@ typedef struct {
   float* data;
 } drmr_sample;
 
-int load_sample(char* path,drmr_sample* smp);
-
 // lv2 stuff
 
 #define DRMR_URI "http://github.com/nicklan/drmr"

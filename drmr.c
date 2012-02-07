@@ -22,39 +22,6 @@
 #include "drmr.h"
 #include "drmr_hydrogen.h"
 
-int load_sample(char* path, drmr_sample* samp) {
-  SNDFILE* sndf;
-  int size;
-  
-  //printf("Loading: %s\n",path);
-
-  samp->active = 0;
-
-  memset(&(samp->info),0,sizeof(SF_INFO));
-  sndf = sf_open(path,SFM_READ,&(samp->info));
-  
-  if (!sndf) {
-    fprintf(stderr,"Failed to open sound file: %s - %s\n",path,sf_strerror(sndf));
-    return 1;
-  }
-
-  if (samp->info.channels > 2) {
-    fprintf(stderr, "File has too many channels.  Can only handle mono/stereo samples\n");
-    return 1;
-  }
-  size = samp->info.frames * samp->info.channels;
-  samp->limit = size;
-  samp->data = malloc(size*sizeof(float));
-  if (!samp->data) {
-    fprintf(stderr,"Failed to allocate sample memory for %s\n",path);
-    return 1;
-  }
-
-  sf_read_float(sndf,samp->data,size);
-  sf_close(sndf); 
-  return 0;
-}
-
 static void* load_thread(void* arg) {
   DrMr* drmr = (DrMr*)arg;
 
