@@ -45,6 +45,22 @@ typedef enum {
   DRMR_MIDI = 0,
   DRMR_LEFT,
   DRMR_RIGHT,
+  DRMR_GAIN_ONE,
+  DRMR_GAIN_TWO,
+  DRMR_GAIN_THREE,
+  DRMR_GAIN_FOUR,
+  DRMR_GAIN_FIVE,
+  DRMR_GAIN_SIX,
+  DRMR_GAIN_SEVEN,
+  DRMR_GAIN_EIGHT,
+  DRMR_GAIN_NINE,
+  DRMR_GAIN_TEN,
+  DRMR_GAIN_ELEVEN,
+  DRMR_GAIN_TWELVE,
+  DRMR_GAIN_THIRTEEN,
+  DRMR_GAIN_FOURTEEN,
+  DRMR_GAIN_FIFTEEN,
+  DRMR_GAIN_SIXTEEN,
   DRMR_NUM_PORTS
 } DrMrPortIndex;
 
@@ -53,6 +69,10 @@ typedef struct {
   float* left;
   float* right;
   LV2_Event_Buffer *midi_port;
+
+  // params
+  float** gains;
+
 
   // URIs
   LV2_URI_Map_Feature* map;

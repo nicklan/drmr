@@ -24,8 +24,8 @@
 int load_sample(char* path, drmr_sample* samp) {
   SNDFILE* sndf;
   int size;
-
-  printf("Loading: %s\n",path);
+  
+  //printf("Loading: %s\n",path);
 
   samp->active = 0;
 
@@ -81,6 +81,9 @@ instantiate(const LV2_Descriptor*     descriptor,
     return 0;
   }
 
+  drmr->gains = malloc(16*sizeof(float*));
+  for(i = 0;i<16;i++) drmr->gains[i] = NULL;
+
   load_hydrogen_kit(drmr,"/usr/share/hydrogen/data/drumkits/GMkit/");
   //load_hydrogen_kit(drmr,"/usr/share/hydrogen/data/drumkits/3355606kit/");
 
@@ -101,6 +104,54 @@ connect_port(LV2_Handle instance,
     break;
   case DRMR_RIGHT:
     drmr->right = (float*)data;
+    break;
+  case DRMR_GAIN_ONE:
+    if (data) drmr->gains[0] = (float*)data;
+    break;
+  case DRMR_GAIN_TWO:
+    if (data) drmr->gains[1] = (float*)data;
+    break;
+  case DRMR_GAIN_THREE:
+    if (data) drmr->gains[2] = (float*)data;
+    break;
+  case DRMR_GAIN_FOUR:
+    if (data) drmr->gains[3] = (float*)data;
+    break;
+  case DRMR_GAIN_FIVE:
+    if (data) drmr->gains[4] = (float*)data;
+    break;
+  case DRMR_GAIN_SIX:
+    if (data) drmr->gains[5] = (float*)data;
+    break;
+  case DRMR_GAIN_SEVEN:
+    if (data) drmr->gains[6] = (float*)data;
+    break;
+  case DRMR_GAIN_EIGHT:
+    if (data) drmr->gains[7] = (float*)data;
+    break;
+  case DRMR_GAIN_NINE:
+    if (data) drmr->gains[8] = (float*)data;
+    break;
+  case DRMR_GAIN_TEN:
+    if (data) drmr->gains[9] = (float*)data;
+    break;
+  case DRMR_GAIN_ELEVEN:
+    if (data) drmr->gains[10] = (float*)data;
+    break;
+  case DRMR_GAIN_TWELVE:
+    if (data) drmr->gains[11] = (float*)data;
+    break;
+  case DRMR_GAIN_THIRTEEN:
+    if (data) drmr->gains[12] = (float*)data;
+    break;
+  case DRMR_GAIN_FOURTEEN:
+    if (data) drmr->gains[13] = (float*)data;
+    break;
+  case DRMR_GAIN_FIFTEEN:
+    if (data) drmr->gains[14] = (float*)data;
+    break;
+  case DRMR_GAIN_SIXTEEN:
+    if (data) drmr->gains[15] = (float*)data;
     break;
   default:
     break;
@@ -139,9 +190,9 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	default:
 	  printf("Unhandeled status: %i\n",(*data)>>4);
 	}
-      }
+      } else printf("unrecognized event\n");
       lv2_event_increment(&eit);
-    }
+    } 
   }
 
   first_active = 1;
@@ -149,20 +200,21 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
     int pos,lim;
     drmr_sample* cs = drmr->samples+i;
     if (cs->active) {
+      float gain = *(drmr->gains[i]);
       one_active = 1;
       if (cs->info.channels == 1) { // play mono sample
 	lim = (n_samples < (cs->limit - cs->offset)?n_samples:(cs->limit-cs->offset));
 	if (first_active) {
 	  for(pos = 0;pos < lim;pos++) {
-	    drmr->left[pos]  = cs->data[cs->offset];
-	    drmr->right[pos] = cs->data[cs->offset];
+	    drmr->left[pos]  = cs->data[cs->offset]*gain;
+	    drmr->right[pos] = cs->data[cs->offset]*gain;
 	    cs->offset++;
 	  }
 	  first_active = 0;
 	} else {
 	  for(pos = 0;pos < lim;pos++) {
-	    drmr->left[pos]  += cs->data[cs->offset];
-	    drmr->right[pos] += cs->data[cs->offset];
+	    drmr->left[pos]  += cs->data[cs->offset]*gain;
+	    drmr->right[pos] += cs->data[cs->offset]*gain;
 	    cs->offset++;
 	  }
 	}
@@ -171,14 +223,14 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	if (lim > n_samples) lim = n_samples;
 	if (first_active) {
 	  for (pos=0;pos<lim;pos++) {
-	    drmr->left[pos]  = cs->data[cs->offset++];
-	    drmr->right[pos] = cs->data[cs->offset++];
+	    drmr->left[pos]  = cs->data[cs->offset++]*gain;
+	    drmr->right[pos] = cs->data[cs->offset++]*gain;
 	  }
 	  first_active = 0;
 	} else {
 	  for (pos=0;pos<lim;pos++) {
-	    drmr->left[pos]  += cs->data[cs->offset++];
-	    drmr->right[pos] += cs->data[cs->offset++];
+	    drmr->left[pos]  += cs->data[cs->offset++]*gain;
+	    drmr->right[pos] += cs->data[cs->offset++]*gain;
 	  }
 	}
       }
