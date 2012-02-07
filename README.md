@@ -22,9 +22,9 @@ Compilation and Install
 -----------------------
 You'll need the following libraries to build and install DrMr:
 
-- [http://www.mega-nerd.com/libsndfile/](libsndfile)
-- [http://lv2plug.in/](lv2)
-- [http://expat.sourceforge.net](libexpat)
+- [libsndfile](http://www.mega-nerd.com/libsndfile/)
+- [lv2](http://lv2plug.in/)
+- [libexpat](http://expat.sourceforge.net)
 
 The Makefile has the INSTALL_DIR and CC flags hard coded to /usr/local/lib/lv2 and gcc at the moment.  Edit those if you want to change that.
 
