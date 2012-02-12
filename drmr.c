@@ -175,6 +175,8 @@ connect_port(LV2_Handle instance,
 
 static void activate(LV2_Handle instance) { }
 
+// taken from lv2 example amp plugin
+#define DB_CO(g) ((g) > -90.0f ? powf(10.0f, (g) * 0.05f) : 0.0f)
 
 static void run(LV2_Handle instance, uint32_t n_samples) {
   int i,kitInt;
@@ -185,7 +187,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
     pthread_cond_signal(&drmr->load_cond);
 
   LV2_Event_Iterator eit;
-  if (lv2_event_begin(&eit,drmr->midi_port)) { // if we have any events
+  if (drmr->midi_port && lv2_event_begin(&eit,drmr->midi_port)) { // if we have any events
     LV2_Event *cur_ev;
     uint8_t* data;
     while (lv2_event_is_valid(&eit)) {
@@ -229,9 +231,9 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
     if (cs->active) {
       float gain;
       if (i < 16)
-	gain = *(drmr->gains[i]);
+	gain = DB_CO(*(drmr->gains[i]));
       else
-	gain = 1.0f;
+	gain = DB_CO(0.0f);
       if (cs->info.channels == 1) { // play mono sample
 	lim = (n_samples < (cs->limit - cs->offset)?n_samples:(cs->limit-cs->offset));
 	for(pos = 0;pos < lim;pos++) {
@@ -265,7 +267,7 @@ static void cleanup(LV2_Handle instance) {
   free(instance);
 }
 
-const void* extension_data(const char* uri) {
+static const void* extension_data(const char* uri) {
   return NULL;
 }
 
