@@ -30,6 +30,7 @@ typedef struct {
   char* name;
   char* desc;
   char* path;
+  int samples;
 } scanned_kit;
 
 typedef struct {
@@ -72,6 +73,22 @@ typedef enum {
   DRMR_GAIN_FOURTEEN,
   DRMR_GAIN_FIFTEEN,
   DRMR_GAIN_SIXTEEN,
+  DRMR_GAIN_SEVENTEEN,
+  DRMR_GAIN_EIGHTEEN,
+  DRMR_GAIN_NINETEEN,
+  DRMR_GAIN_TWENTY,
+  DRMR_GAIN_TWENTYONE,
+  DRMR_GAIN_TWENTYTWO,
+  DRMR_GAIN_TWENTYTHREE,
+  DRMR_GAIN_TWENTYFOUR,
+  DRMR_GAIN_TWENTYFIVE,
+  DRMR_GAIN_TWENTYSIX,
+  DRMR_GAIN_TWENTYSEVEN,
+  DRMR_GAIN_TWENTYEIGHT,
+  DRMR_GAIN_TWENTYNINE,
+  DRMR_GAIN_THIRTY,
+  DRMR_GAIN_THIRTYONE,
+  DRMR_GAIN_THIRTYTWO,
   DRMR_NUM_PORTS
 } DrMrPortIndex;
 
@@ -83,6 +100,7 @@ typedef struct {
 
   // params
   float** gains;
+  float** pans;
   float* kitReq;
 
   // URIs

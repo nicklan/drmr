@@ -4,6 +4,7 @@
 @prefix doap: <http://usefulinc.com/ns/doap#>.
 @prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>.
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix ui:   <http://lv2plug.in/ns/extensions/ui#>.
 
 <http://github.com/nicklan/drmr>
   a lv2:Plugin;
@@ -15,6 +16,7 @@
 	foaf:mbox <nick@afternight.org>
   ] ;
   doap:license <http://usefulinc.com/doap/licenses/gpl>;
+  ui:ui <http://github.com/nicklan/drmr#ui> ;
   lv2:port [
     a ev:EventPort, lv2:InputPort;
     lv2:index 0;
@@ -262,8 +264,240 @@
     lv2:index 19;
     lv2:symbol "gain_sixteen";
     lv2:name "Sample Sixteen Gain";
-    lv2:minimum 0.0;
-    lv2:maximum 1.0;
-    lv2:default 1.0;
+    lv2:minimum -90.0;
+    lv2:maximum 6.0;
+    lv2:default 0.0;
+    lv2:scalePoint [
+      rdfs:label "-inf" ;
+      rdf:value -90.0
+    ]
+  ],
+
+ [
+    a lv2:ControlPort, lv2:InputPort;
+    lv2:index 20;
+    lv2:symbol "gain_seventeen";
+    lv2:name "Sample Seventeen Gain";
+    lv2:minimum -90.0;
+    lv2:maximum 6.0;
+    lv2:default 0.0;
+    lv2:scalePoint [
+      rdfs:label "-inf" ;
+      rdf:value -90.0
+      ]
+  ],
+
+
+  [
+    a lv2:ControlPort, lv2:InputPort;
+    lv2:index 21;
+    lv2:symbol "gain_eighteen";
+    lv2:name "Sample Eighteen Gain";
+    lv2:minimum -90.0;
+    lv2:maximum 6.0;
+    lv2:default 0.0;
+    lv2:scalePoint [
+      rdfs:label "-inf" ;
+      rdf:value -90.0
+      ]
+  ],
+
+  [
+    a lv2:ControlPort, lv2:InputPort;
+    lv2:index 22;
+    lv2:symbol "gain_nineteen";
+    lv2:name "Sample Nineteen Gain";
+    lv2:minimum -90.0;
+    lv2:maximum 6.0;
+    lv2:default 0.0;
+    lv2:scalePoint [
+      rdfs:label "-inf" ;
+      rdf:value -90.0
+      ]
+  ],
+
+  [
+    a lv2:ControlPort, lv2:InputPort;
+    lv2:index 23;
+    lv2:symbol "gain_twenty";
+    lv2:name "Sample Twenty Gain";
+    lv2:minimum -90.0;
+    lv2:maximum 6.0;
+    lv2:default 0.0;
+    lv2:scalePoint [
+      rdfs:label "-inf" ;
+      rdf:value -90.0
+      ]
+  ],
+
+  [
+    a lv2:ControlPort, lv2:InputPort;
+    lv2:index 24;
+    lv2:symbol "gain_twentyone";
+    lv2:name "Sample Twenty One Gain";
+    lv2:minimum -90.0;
+    lv2:maximum 6.0;
+    lv2:default 0.0;
+    lv2:scalePoint [
+      rdfs:label "-inf" ;
+      rdf:value -90.0
+      ]
+  ],
+
+  [
+    a lv2:ControlPort, lv2:InputPort;
+    lv2:index 25;
+    lv2:symbol "gain_twentytwo";
+    lv2:name "Sample Twenty Two Gain";
+    lv2:minimum -90.0;
+    lv2:maximum 6.0;
+    lv2:default 0.0;
+    lv2:scalePoint [
+      rdfs:label "-inf" ;
+      rdf:value -90.0
+      ]
+  ],
+
+  [
+    a lv2:ControlPort, lv2:InputPort;
+    lv2:index 26;
+    lv2:symbol "gain_twentythree";
+    lv2:name "Sample Twenty Three Gain";
+    lv2:minimum -90.0;
+    lv2:maximum 6.0;
+    lv2:default 0.0;
+    lv2:scalePoint [
+      rdfs:label "-inf" ;
+      rdf:value -90.0
+      ]
+  ],
+
+  [
+    a lv2:ControlPort, lv2:InputPort;
+    lv2:index 27;
+    lv2:symbol "gain_twentyfour";
+    lv2:name "Sample Twenty Four Gain";
+    lv2:minimum -90.0;
+    lv2:maximum 6.0;
+    lv2:default 0.0;
+    lv2:scalePoint [
+      rdfs:label "-inf" ;
+      rdf:value -90.0
+      ]
+  ],
+
+  [
+    a lv2:ControlPort, lv2:InputPort;
+    lv2:index 28;
+    lv2:symbol "gain_twentyfive";
+    lv2:name "Sample Twenty Five Gain";
+    lv2:minimum -90.0;
+    lv2:maximum 6.0;
+    lv2:default 0.0;
+    lv2:scalePoint [
+      rdfs:label "-inf" ;
+      rdf:value -90.0
+      ]
+  ],
+
+  [
+    a lv2:ControlPort, lv2:InputPort;
+    lv2:index 29;
+    lv2:symbol "gain_twentysix";
+    lv2:name "Sample Twenty Six Gain";
+    lv2:minimum -90.0;
+    lv2:maximum 6.0;
+    lv2:default 0.0;
+    lv2:scalePoint [
+      rdfs:label "-inf" ;
+      rdf:value -90.0
+      ]
+  ],
+
+  [
+    a lv2:ControlPort, lv2:InputPort;
+    lv2:index 30;
+    lv2:symbol "gain_twentyseven";
+    lv2:name "Sample Twenty Seven Gain";
+    lv2:minimum -90.0;
+    lv2:maximum 6.0;
+    lv2:default 0.0;
+    lv2:scalePoint [
+      rdfs:label "-inf" ;
+      rdf:value -90.0
+      ]
+  ],
+
+  [
+    a lv2:ControlPort, lv2:InputPort;
+    lv2:index 31;
+    lv2:symbol "gain_twentyeight";
+    lv2:name "Sample Twenty Eight Gain";
+    lv2:minimum -90.0;
+    lv2:maximum 6.0;
+    lv2:default 0.0;
+    lv2:scalePoint [
+      rdfs:label "-inf" ;
+      rdf:value -90.0
+      ]
+  ],
+
+  [
+    a lv2:ControlPort, lv2:InputPort;
+    lv2:index 32;
+    lv2:symbol "gain_twentynine";
+    lv2:name "Sample Twenty Nine Gain";
+    lv2:minimum -90.0;
+    lv2:maximum 6.0;
+    lv2:default 0.0;
+    lv2:scalePoint [
+      rdfs:label "-inf" ;
+      rdf:value -90.0
+      ]
+  ],
+
+  [
+    a lv2:ControlPort, lv2:InputPort;
+    lv2:index 33;
+    lv2:symbol "gain_thirty";
+    lv2:name "Sample Thirty Gain";
+    lv2:minimum -90.0;
+    lv2:maximum 6.0;
+    lv2:default 0.0;
+    lv2:scalePoint [
+      rdfs:label "-inf" ;
+      rdf:value -90.0
+      ]
+  ],
+
+  [
+    a lv2:ControlPort, lv2:InputPort;
+    lv2:index 34;
+    lv2:symbol "gain_thirtyone";
+    lv2:name "Sample Thirty One Gain";
+    lv2:minimum -90.0;
+    lv2:maximum 6.0;
+    lv2:default 0.0;
+    lv2:scalePoint [
+      rdfs:label "-inf" ;
+      rdf:value -90.0
+      ]
+  ],
+
+  [
+    a lv2:ControlPort, lv2:InputPort;
+    lv2:index 35;
+    lv2:symbol "gain_thirtytwo";
+    lv2:name "Sample Thirty Two Gain";
+    lv2:minimum -90.0;
+    lv2:maximum 6.0;
+    lv2:default 0.0;
+    lv2:scalePoint [
+      rdfs:label "-inf" ;
+      rdf:value -90.0
+    ]
   ].
 
+<http://github.com/nicklan/drmr#ui>
+  a ui:GtkUI ;
+  ui:binary <drmr_ui.so> .

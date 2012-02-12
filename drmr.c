@@ -96,7 +96,8 @@ instantiate(const LV2_Descriptor*     descriptor,
   load_hydrogen_kit(drmr,drmr->kits->kits->path);
   drmr->curKit = 0;
 
-  drmr->gains = malloc(16*sizeof(float*));
+  drmr->gains = malloc(32*sizeof(float*));
+  drmr->pans = malloc(32*sizeof(float*));
   for(i = 0;i<16;i++) drmr->gains[i] = NULL;
 
   return (LV2_Handle)drmr;
@@ -107,7 +108,8 @@ connect_port(LV2_Handle instance,
              uint32_t   port,
              void*      data) {
   DrMr* drmr = (DrMr*)instance;
-  switch ((DrMrPortIndex)port) {
+  DrMrPortIndex port_index = (DrMrPortIndex)port;
+  switch (port_index) {
   case DRMR_MIDI:
     drmr->midi_port = (LV2_Event_Buffer*)data;
     break;
@@ -120,61 +122,17 @@ connect_port(LV2_Handle instance,
   case DRMR_KITNUM:
     if(data) drmr->kitReq = (float*)data;
     break;
-  case DRMR_GAIN_ONE:
-    if (data) drmr->gains[0] = (float*)data;
-    break;
-  case DRMR_GAIN_TWO:
-    if (data) drmr->gains[1] = (float*)data;
-    break;
-  case DRMR_GAIN_THREE:
-    if (data) drmr->gains[2] = (float*)data;
-    break;
-  case DRMR_GAIN_FOUR:
-    if (data) drmr->gains[3] = (float*)data;
-    break;
-  case DRMR_GAIN_FIVE:
-    if (data) drmr->gains[4] = (float*)data;
-    break;
-  case DRMR_GAIN_SIX:
-    if (data) drmr->gains[5] = (float*)data;
-    break;
-  case DRMR_GAIN_SEVEN:
-    if (data) drmr->gains[6] = (float*)data;
-    break;
-  case DRMR_GAIN_EIGHT:
-    if (data) drmr->gains[7] = (float*)data;
-    break;
-  case DRMR_GAIN_NINE:
-    if (data) drmr->gains[8] = (float*)data;
-    break;
-  case DRMR_GAIN_TEN:
-    if (data) drmr->gains[9] = (float*)data;
-    break;
-  case DRMR_GAIN_ELEVEN:
-    if (data) drmr->gains[10] = (float*)data;
-    break;
-  case DRMR_GAIN_TWELVE:
-    if (data) drmr->gains[11] = (float*)data;
-    break;
-  case DRMR_GAIN_THIRTEEN:
-    if (data) drmr->gains[12] = (float*)data;
-    break;
-  case DRMR_GAIN_FOURTEEN:
-    if (data) drmr->gains[13] = (float*)data;
-    break;
-  case DRMR_GAIN_FIFTEEN:
-    if (data) drmr->gains[14] = (float*)data;
-    break;
-  case DRMR_GAIN_SIXTEEN:
-    if (data) drmr->gains[15] = (float*)data;
-    break;
   default:
     break;
   }
+
+  if (port_index >= DRMR_GAIN_ONE && port_index <= DRMR_GAIN_THIRTYTWO) {
+    int goff = port_index - DRMR_GAIN_ONE;
+    drmr->gains[goff] = (float*)data;
+  }
 }
 
-static void activate(LV2_Handle instance) { }
-
+#define DB3SCALE -0.8317830986718104f
 // taken from lv2 example amp plugin
 #define DB_CO(g) ((g) > -90.0f ? powf(10.0f, (g) * 0.05f) : 0.0f)
 
@@ -230,7 +188,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
     drmr_sample* cs = drmr->samples+i;
     if (cs->active) {
       float gain;
-      if (i < 16)
+      if (i < 32)
 	gain = DB_CO(*(drmr->gains[i]));
       else
 	gain = DB_CO(0.0f);
@@ -255,6 +213,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
   pthread_mutex_unlock(&drmr->load_mutex); 
 }
 
+static void activate  (LV2_Handle instance) {}
 static void deactivate(LV2_Handle instance) {}
 
 static void cleanup(LV2_Handle instance) {
