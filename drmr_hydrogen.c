@@ -47,6 +47,7 @@ struct instrument_info {
 struct kit_info {
   char* name;
   char* desc;
+  int inst_count;
   // linked list of intruments, null terminated
   struct instrument_info* instruments;
 };
@@ -99,15 +100,20 @@ endElement(void *userData, const char *name)
   if (info->scan_only && info->in_info && !info->in_instrument_list && !strcmp(name,"info"))
     info->kit_info->desc = strdup(info->cur_buf);
 
-  if (!info->scan_only && info->in_instrument) {
-    if (!strcmp(name,"id"))
-      info->cur_instrument->id = atoi(info->cur_buf);
-    if (!strcmp(name,"filename"))
-      info->cur_instrument->filename = strdup(info->cur_buf);
-    if (!strcmp(name,"name"))
-      info->cur_instrument->name = strdup(info->cur_buf);
+  if (info->in_instrument) {
+    if (info->scan_only) {
+      if (!strcmp(name,"filename"))
+	info->kit_info->inst_count++;
+    }
+    else {
+      if (!strcmp(name,"id"))
+	info->cur_instrument->id = atoi(info->cur_buf);
+      if (!strcmp(name,"filename"))
+	info->cur_instrument->filename = strdup(info->cur_buf);
+      if (!strcmp(name,"name"))
+	info->cur_instrument->name = strdup(info->cur_buf);
+    }
   }
-    
 
   info->cur_off = 0;
 
@@ -202,6 +208,7 @@ kits* scan_kits() {
 	  memset(node,0,sizeof(struct kit_list));
 	  kit->name = info.kit_info->name;
 	  kit->desc = info.kit_info->desc;
+	  kit->samples = info.kit_info->inst_count;
 	  snprintf(buf,BUFSIZ,"%s/%s/",cur_path,ep->d_name);
 	  kit->path = strdup(buf);
 	  node->skit = kit;
@@ -239,6 +246,7 @@ kits* scan_kits() {
     ret->kits[cp].name = cur_k->skit->name;
     ret->kits[cp].desc = cur_k->skit->desc;
     ret->kits[cp].path = cur_k->skit->path;
+    ret->kits[cp].samples = cur_k->skit->samples;
     cp++;
     free(cur_k->skit);
     cur_k = cur_k->next;

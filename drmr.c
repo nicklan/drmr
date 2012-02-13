@@ -98,7 +98,10 @@ instantiate(const LV2_Descriptor*     descriptor,
 
   drmr->gains = malloc(32*sizeof(float*));
   drmr->pans = malloc(32*sizeof(float*));
-  for(i = 0;i<16;i++) drmr->gains[i] = NULL;
+  for(i = 0;i<32;i++) {
+    drmr->gains[i] = NULL;
+    drmr->pans[i] = NULL;
+  }
 
   return (LV2_Handle)drmr;
 }
@@ -130,11 +133,17 @@ connect_port(LV2_Handle instance,
     int goff = port_index - DRMR_GAIN_ONE;
     drmr->gains[goff] = (float*)data;
   }
+
+  if (port_index >= DRMR_PAN_ONE && port_index <= DRMR_PAN_THIRTYTWO) {
+    int poff = port_index - DRMR_PAN_ONE;
+    drmr->pans[poff] = (float*)data;
+  }
 }
 
 #define DB3SCALE -0.8317830986718104f
+#define DB3SCALEPO 1.8317830986718104f
 // taken from lv2 example amp plugin
-#define DB_CO(g) ((g) > -90.0f ? powf(10.0f, (g) * 0.05f) : 0.0f)
+#define DB_CO(g) ((g) > GAIN_MIN ? powf(10.0f, (g) * 0.05f) : 0.0f)
 
 static void run(LV2_Handle instance, uint32_t n_samples) {
   int i,kitInt;
@@ -187,24 +196,31 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
     int pos,lim;
     drmr_sample* cs = drmr->samples+i;
     if (cs->active) {
-      float gain;
-      if (i < 32)
-	gain = DB_CO(*(drmr->gains[i]));
-      else
-	gain = DB_CO(0.0f);
+      float coef_right, coef_left;
+      if (i < 32) {
+	float gain = DB_CO(*(drmr->gains[i]));
+	float pan_right = ((*drmr->pans[i])+1)/2.0f;
+	float pan_left = 1-pan_right;
+	coef_right = (pan_right * (DB3SCALE * pan_right + DB3SCALEPO))*gain;
+	coef_left = (pan_left * (DB3SCALE * pan_left + DB3SCALEPO))*gain;
+      }
+      else {
+	coef_right = coef_left = 1.0f;
+      }
+
       if (cs->info.channels == 1) { // play mono sample
 	lim = (n_samples < (cs->limit - cs->offset)?n_samples:(cs->limit-cs->offset));
 	for(pos = 0;pos < lim;pos++) {
-	  drmr->left[pos]  += cs->data[cs->offset]*gain;
-	  drmr->right[pos] += cs->data[cs->offset]*gain;
+	  drmr->left[pos]  += cs->data[cs->offset]*coef_left;
+	  drmr->right[pos] += cs->data[cs->offset]*coef_right;
 	  cs->offset++;
 	}
       } else { // play stereo sample
 	lim = (cs->limit-cs->offset)/cs->info.channels;
 	if (lim > n_samples) lim = n_samples;
 	for (pos=0;pos<lim;pos++) {
-	  drmr->left[pos]  += cs->data[cs->offset++]*gain;
-	  drmr->right[pos] += cs->data[cs->offset++]*gain;
+	  drmr->left[pos]  += cs->data[cs->offset++]*coef_left;
+	  drmr->right[pos] += cs->data[cs->offset++]*coef_right;
 	}
       }
       if (cs->offset >= cs->limit) cs->active = 0;
