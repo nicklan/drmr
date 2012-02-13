@@ -155,9 +155,11 @@ static inline void layer_to_sample(drmr_sample *sample, float gain) {
     }
   }
   fprintf(stderr,"Couldn't find layer for gain %f in sample\n\n",gain);
-  sample->limit = 0;
-  sample->info = NULL;
-  sample->data = NULL;
+  /* to avoid not playing something, and to deal with kits like the 
+     k-27_trash_kit, let's just use the first layer */ 
+  sample->limit = sample->layers[0].limit;
+  sample->info = sample->layers[0].info;
+  sample->data = sample->layers[0].data;
 }
 
 #define DB3SCALE -0.8317830986718104f
@@ -194,9 +196,8 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	  if (nn >= 0 && nn < drmr->num_samples) {
 	    if (drmr->samples[nn].layer_count > 0)
 	      layer_to_sample(drmr->samples+nn,*(drmr->gains[nn]));
-	    if (drmr->samples[nn].limit == 0) {
-	      printf("Fail at: %i for %f\n",nn,*drmr->gains[nn]);
-	    }
+	    if (drmr->samples[nn].limit == 0)
+	      fprintf(stderr,"Failed to find layer at: %i for %f\n",nn,*drmr->gains[nn]);
 	    drmr->samples[nn].active = 1;
 	    drmr->samples[nn].offset = 0;
 	  }
