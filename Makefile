@@ -1,4 +1,4 @@
-BUNDLE = lv2pftci-drmr.lv2
+BUNDLE = drmr.lv2
 INSTALL_DIR = /usr/local/lib/lv2
 CC=gcc
 
