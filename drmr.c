@@ -263,6 +263,7 @@ static void cleanup(LV2_Handle instance) {
   pthread_join(drmr->load_thread, 0);
   if (drmr->num_samples > 0)
     free_samples(drmr->samples,drmr->num_samples);
+  free_kits(drmr->kits);
   free(drmr->gains);
   free(instance);
 }

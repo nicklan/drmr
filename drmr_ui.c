@@ -214,6 +214,7 @@ static void cleanup(LV2UI_Handle handle) {
   gtk_widget_destroy(ui->drmr_widget);
   if (ui->gain_sliders) free(ui->gain_sliders);
   if (ui->pan_sliders) free(ui->pan_sliders);
+  free_kits(ui->kits);
   free(ui);
 }
 

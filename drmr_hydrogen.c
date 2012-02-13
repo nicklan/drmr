@@ -326,6 +326,17 @@ void free_samples(drmr_sample* samples, int num_samples) {
   free(samples);
 }
 
+void free_kits(kits* kits) {
+  int i;
+  for (i = 0;i < kits->num_kits;i++) {
+    free(kits->kits[i].name);
+    free(kits->kits[i].desc);
+    free(kits->kits[i].path);
+  }
+  free(kits->kits);
+  free(kits);
+}
+
 int load_sample(char* path, drmr_layer* layer) {
   SNDFILE* sndf;
   int size;
