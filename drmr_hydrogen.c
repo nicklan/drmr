@@ -30,7 +30,9 @@
 static char* default_drumkit_locations[] = {
   "/usr/share/hydrogen/data/drumkits/",
   "/usr/local/share/hydrogen/data/drumkits/",
+  "/usr/share/drmr/drumkits/",
   "~/.hydrogen/data/drumkits/",
+  "~/.drmr/drumkits/",
   NULL
 };
 
@@ -273,7 +275,7 @@ kits* scan_kits() {
       }
       (void) closedir (dp);
     }
-    else
+    else if (errno != ENOENT)
       fprintf(stderr,"Couldn't open %s: %s\n",cur_path,strerror(errno));
     cur_path = default_drumkit_locations[cp++];
   }
