@@ -37,6 +37,7 @@ typedef struct {
 
   GQuark gain_quark, pan_quark;
 
+  int curKit;
   kits* kits;
 } DrMrUi;
 
@@ -127,8 +128,26 @@ static void fill_sample_table(DrMrUi* ui, int samples) {
 }
 
 void kit_combobox_changed(GtkComboBox* box, gpointer data) {
+  DrMrUi* ui = (DrMrUi*)data;
   gint new_kit = gtk_combo_box_get_active (GTK_COMBO_BOX(box));
-  printf("kit changed: %i\n",new_kit);
+  float fkit = (float)new_kit;
+  if (ui->curKit >= 0 && ui->curKit != new_kit) {
+    int samples = ui->kits->kits[new_kit].samples;
+    if (ui->sample_table)
+      gtk_widget_destroy(GTK_WIDGET(ui->sample_table));
+    ui->sample_table = GTK_TABLE(gtk_table_new(1,1,true));
+    ui->curKit = new_kit;
+    if (ui->gain_sliders) free(ui->gain_sliders);
+    if (ui->pan_sliders) free(ui->pan_sliders);
+    ui->gain_sliders = malloc(samples*sizeof(GtkWidget*));
+    ui->pan_sliders = malloc(samples*sizeof(GtkWidget*));
+    fill_sample_table(ui,samples);
+    gtk_box_pack_start(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),
+		       true,true,5);
+    gtk_box_reorder_child(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),0);
+    gtk_widget_show_all(GTK_WIDGET(ui->sample_table));
+    ui->write(ui->controller,DRMR_KITNUM,4,0,&fkit);
+  }
 }
 
 static void fill_kit_combo(GtkComboBoxText* combo, kits* kits) {
@@ -167,7 +186,7 @@ static void build_drmr_ui(DrMrUi* ui) {
   ui->sample_table = GTK_TABLE(sample_table);
   ui->kit_combo = GTK_COMBO_BOX_TEXT(kit_combo_box);
 
-  g_signal_connect(G_OBJECT(kit_combo_box),"changed",G_CALLBACK(kit_combobox_changed),NULL);
+  g_signal_connect(G_OBJECT(kit_combo_box),"changed",G_CALLBACK(kit_combobox_changed),ui);
 
   gtk_widget_show_all(drmr_ui_widget);
 }
@@ -186,6 +205,7 @@ instantiate(const LV2UI_Descriptor*   descriptor,
   ui->write      = write_function;
   ui->controller = controller;
   ui->drmr_widget = NULL;
+  ui->curKit = -1;
   *widget = NULL;
 
   build_drmr_ui(ui);
@@ -225,6 +245,7 @@ port_event(LV2UI_Handle handle,
     else {
       int kit = (int)(*((float*)buffer));
       int samples = ui->kits->kits[kit].samples;
+      ui->curKit = kit;
       ui->gain_sliders = malloc(samples*sizeof(GtkWidget*));
       ui->pan_sliders = malloc(samples*sizeof(GtkWidget*));
       fill_sample_table(ui,samples);
