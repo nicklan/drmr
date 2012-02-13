@@ -41,10 +41,21 @@ typedef struct {
 // libsndfile stuff
 
 typedef struct {
-  SF_INFO info;
+  float min;
+  float max;
+
+  SF_INFO *info;
+  uint32_t limit;
+  float* data;
+} drmr_layer;
+
+typedef struct {
+  SF_INFO *info;
   char active;
   uint32_t offset;
   uint32_t limit;
+  uint32_t layer_count;
+  drmr_layer *layers;
   float* data;
 } drmr_sample;
 
@@ -52,6 +63,7 @@ typedef struct {
 
 #define DRMR_URI "http://github.com/nicklan/drmr"
 #define GAIN_MIN -60.0f
+#define GAIN_MAX 6.0f
 
 typedef enum {
   DRMR_MIDI = 0,

@@ -140,6 +140,26 @@ connect_port(LV2_Handle instance,
   }
 }
 
+static inline void layer_to_sample(drmr_sample *sample, float gain) {
+  int i;
+  float mapped_gain = (1-(gain/GAIN_MIN));
+  if (mapped_gain > 1.0f) mapped_gain = 1.0f;
+  for(i = 0;i < sample->layer_count;i++) {
+    if (sample->layers[i].min <= mapped_gain &&
+	(sample->layers[i].max > mapped_gain ||
+	 sample->layers[i].max == 1 && mapped_gain == 1)) {
+      sample->limit = sample->layers[i].limit;
+      sample->info = sample->layers[i].info;
+      sample->data = sample->layers[i].data;
+      return;
+    }
+  }
+  fprintf(stderr,"Couldn't find layer for gain %f in sample\n\n",gain);
+  sample->limit = 0;
+  sample->info = NULL;
+  sample->data = NULL;
+}
+
 #define DB3SCALE -0.8317830986718104f
 #define DB3SCALEPO 1.8317830986718104f
 // taken from lv2 example amp plugin
@@ -172,6 +192,11 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	  // changed after the check that the midi-note is valid
 	  pthread_mutex_lock(&drmr->load_mutex); 
 	  if (nn >= 0 && nn < drmr->num_samples) {
+	    if (drmr->samples[nn].layer_count > 0)
+	      layer_to_sample(drmr->samples+nn,*(drmr->gains[nn]));
+	    if (drmr->samples[nn].limit == 0) {
+	      printf("Fail at: %i for %f\n",nn,*drmr->gains[nn]);
+	    }
 	    drmr->samples[nn].active = 1;
 	    drmr->samples[nn].offset = 0;
 	  }
@@ -195,7 +220,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
   for (i = 0;i < drmr->num_samples;i++) {
     int pos,lim;
     drmr_sample* cs = drmr->samples+i;
-    if (cs->active) {
+    if (cs->active && (cs->limit > 0)) {
       float coef_right, coef_left;
       if (i < 32) {
 	float gain = DB_CO(*(drmr->gains[i]));
@@ -208,7 +233,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	coef_right = coef_left = 1.0f;
       }
 
-      if (cs->info.channels == 1) { // play mono sample
+      if (cs->info->channels == 1) { // play mono sample
 	lim = (n_samples < (cs->limit - cs->offset)?n_samples:(cs->limit-cs->offset));
 	for(pos = 0;pos < lim;pos++) {
 	  drmr->left[pos]  += cs->data[cs->offset]*coef_left;
@@ -216,7 +241,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	  cs->offset++;
 	}
       } else { // play stereo sample
-	lim = (cs->limit-cs->offset)/cs->info.channels;
+	lim = (cs->limit-cs->offset)/cs->info->channels;
 	if (lim > n_samples) lim = n_samples;
 	for (pos=0;pos<lim;pos++) {
 	  drmr->left[pos]  += cs->data[cs->offset++]*coef_left;

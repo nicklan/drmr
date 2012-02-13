@@ -38,9 +38,9 @@ static char* default_drumkit_locations[] = {
 
 struct instrument_layer {
   char* filename;
-  int min;
-  int max;
-  int gain;
+  float min;
+  float max;
+  float gain;
   struct instrument_layer *next;
 };
 
@@ -48,7 +48,7 @@ struct instrument_info {
   int id;
   char* filename;
   char* name;
-  int gain;
+  float gain;
   struct instrument_layer *layers;
   struct instrument_info *next;
   // maybe pan/vol/etc..
@@ -124,11 +124,11 @@ endElement(void *userData, const char *name)
     if (!strcmp(name,"filename"))
       info->cur_layer->filename = strdup(info->cur_buf);
     if (!strcmp(name,"min"))
-      info->cur_layer->min = atoi(info->cur_buf);
+      info->cur_layer->min = atof(info->cur_buf);
     if (!strcmp(name,"max"))
-      info->cur_layer->max = atoi(info->cur_buf);
+      info->cur_layer->max = atof(info->cur_buf);
     if (!strcmp(name,"gain"))
-      info->cur_layer->gain = atoi(info->cur_buf);
+      info->cur_layer->gain = atof(info->cur_buf);
   }
 
   if (info->in_instrument) {
@@ -138,7 +138,7 @@ endElement(void *userData, const char *name)
 	info->counted_cur_inst = 1;
       }
     }
-    else {
+    else if (!info->in_layer) {
       if (!strcmp(name,"id"))
 	info->cur_instrument->id = atoi(info->cur_buf);
       if (!strcmp(name,"filename"))
@@ -310,42 +310,53 @@ kits* scan_kits() {
 }
 
 void free_samples(drmr_sample* samples, int num_samples) {
-  int i;
-  for (i=0;i<num_samples;i++)
-    if (samples[i].data)
-      free(samples[i].data);
+  int i,j;
+  for (i=0;i<num_samples;i++) {
+    if (samples[i].layer_count == 0) {
+      if (samples[i].info) free(samples[i].info);
+      if (samples[i].data) free(samples[i].data);
+    } else {
+      for (j = 0;j < samples[i].layer_count;j++) {
+	if (samples[i].layers[j].info) free(samples[i].layers[j].info);
+	if (samples[i].layers[j].data) free(samples[i].layers[j].data);
+      }
+      free(samples[i].layers);
+    }
+  }
   free(samples);
 }
 
-int load_sample(char* path, drmr_sample* samp) {
+int load_sample(char* path, drmr_layer* layer) {
   SNDFILE* sndf;
   int size;
   
   //printf("Loading: %s\n",path);
 
-  samp->active = 0;
-
-  memset(&(samp->info),0,sizeof(SF_INFO));
-  sndf = sf_open(path,SFM_READ,&(samp->info));
+  layer->info = malloc(sizeof(SF_INFO));
+  memset(layer->info,0,sizeof(SF_INFO));
+  sndf = sf_open(path,SFM_READ,layer->info);
   
   if (!sndf) {
     fprintf(stderr,"Failed to open sound file: %s - %s\n",path,sf_strerror(sndf));
+    free(layer->info);
     return 1;
   }
 
-  if (samp->info.channels > 2) {
+  if (layer->info->channels > 2) {
     fprintf(stderr, "File has too many channels.  Can only handle mono/stereo samples\n");
+    free(layer->info);
     return 1;
   }
-  size = samp->info.frames * samp->info.channels;
-  samp->limit = size;
-  samp->data = malloc(size*sizeof(float));
-  if (!samp->data) {
+  size = layer->info->frames * layer->info->channels;
+  layer->limit = size;
+  layer->data = malloc(size*sizeof(float));
+  if (!layer->data) {
     fprintf(stderr,"Failed to allocate sample memory for %s\n",path);
+    free(layer->info);
     return 1;
   }
 
-  sf_read_float(sndf,samp->data,size);
+  sf_read_float(sndf,layer->data,size);
   sf_close(sndf); 
   return 0;
 }
@@ -406,14 +417,53 @@ int load_hydrogen_kit(DrMr* drmr, char* path) {
     samples = malloc(num_inst*sizeof(drmr_sample));
     cur_i = kit_info.instruments;
     while(cur_i) {
-      snprintf(buf,BUFSIZ,"%s/%s",path,cur_i->filename);
-      if (load_sample(buf,samples+i)) {
-	fprintf(stderr,"Could not load sample: %s\n",buf);
+      if (cur_i->filename) { // top level filename, just make one dummy layer
+	drmr_layer *layer = malloc(sizeof(drmr_layer));
+	layer->min = 0;
+	layer->max = 1;
+	snprintf(buf,BUFSIZ,"%s/%s",path,cur_i->filename);
+	if (load_sample(buf,layer)) {
+	  fprintf(stderr,"Could not load sample: %s\n",buf);
+	  // set limit to zero, will never try and play
+	  layer->info = NULL;
+	  layer->limit = 0;
+	  layer->data = NULL;
+	}
+	samples[i].layer_count = 0;
+	samples[i].layers = NULL;
 	samples[i].offset = 0;
-	// set limit to zero, will never try and play
-	samples[i].limit = 0; 
-	samples[i].data = NULL;
+	samples[i].info = layer->info;
+	samples[i].limit = layer->limit;
+	samples[i].data = layer->data;
+	free(layer);
+      } else {
+	int layer_count = 0;
+	int j;
+	struct instrument_layer *cur_l = cur_i->layers;
+	while(cur_l) {
+	  layer_count++;
+	  cur_l = cur_l->next;
+	}
+	samples[i].layer_count = layer_count;
+	samples[i].layers = malloc(sizeof(drmr_layer)*layer_count);
+	cur_l = cur_i->layers;
+	j = 0;
+	while(cur_l) {
+	  snprintf(buf,BUFSIZ,"%s/%s",path,cur_l->filename);
+	  if (load_sample(buf,samples[i].layers+j)) {
+	    fprintf(stderr,"Could not load sample: %s\n",buf);
+	    // set limit to zero, will never try and play
+	    samples[i].layers[j].info = NULL;
+	    samples[i].layers[j].limit = 0;
+	    samples[i].layers[j].data = NULL;
+	  }
+	  samples[i].layers[j].min = cur_l->min;
+	  samples[i].layers[j].max = cur_l->max;
+	  j++;
+	  cur_l = cur_l->next;
+	}
       }
+      samples[i].active = 0;
       i++;
       cur_i = cur_i->next;
     }

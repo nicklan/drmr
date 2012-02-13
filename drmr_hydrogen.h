@@ -20,7 +20,7 @@
 
 kits* scan_kits();
 void free_samples(drmr_sample* samples, int num_samples);
-int load_sample(char* path,drmr_sample* smp);
+int load_sample(char* path,drmr_layer* layer);
 int load_hydrogen_kit(DrMr* drmr, char* path);
 
 #endif // DRMR_HYDRO_H
