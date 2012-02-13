@@ -36,11 +36,21 @@ static char* default_drumkit_locations[] = {
 
 #define MAX_CHAR_DATA 512
 
+struct instrument_layer {
+  char* filename;
+  int min;
+  int max;
+  int gain;
+  struct instrument_layer *next;
+};
+
 struct instrument_info {
   int id;
   char* filename;
   char* name;
-  struct instrument_info* next;
+  int gain;
+  struct instrument_layer *layers;
+  struct instrument_info *next;
   // maybe pan/vol/etc..
 };
 
@@ -57,9 +67,12 @@ struct hp_info {
   char in_info;
   char in_instrument_list;
   char in_instrument;
+  char in_layer;
+  char counted_cur_inst;
   int  cur_off;
   char cur_buf[MAX_CHAR_DATA];
   struct instrument_info* cur_instrument;
+  struct instrument_layer* cur_layer;
   struct kit_info* kit_info;
 };
 
@@ -70,6 +83,13 @@ startElement(void *userData, const char *name, const char **atts)
   struct hp_info* info = (struct hp_info*)userData;
   info->cur_off = 0;
   if (info->in_info) {
+    if (info->in_instrument) {
+      if (!strcmp(name,"layer") && !info->scan_only) { 
+	info->in_layer = 1;
+	info->cur_layer = malloc(sizeof(struct instrument_layer));
+	memset(info->cur_layer,0,sizeof(struct instrument_layer));
+      }
+    }
     if (info->in_instrument_list) {
       if (!strcmp(name,"instrument")) {
 	info->in_instrument = 1;
@@ -100,10 +120,23 @@ endElement(void *userData, const char *name)
   if (info->scan_only && info->in_info && !info->in_instrument_list && !strcmp(name,"info"))
     info->kit_info->desc = strdup(info->cur_buf);
 
+  if (info->in_layer && !info->scan_only) {
+    if (!strcmp(name,"filename"))
+      info->cur_layer->filename = strdup(info->cur_buf);
+    if (!strcmp(name,"min"))
+      info->cur_layer->min = atoi(info->cur_buf);
+    if (!strcmp(name,"max"))
+      info->cur_layer->max = atoi(info->cur_buf);
+    if (!strcmp(name,"gain"))
+      info->cur_layer->gain = atoi(info->cur_buf);
+  }
+
   if (info->in_instrument) {
     if (info->scan_only) {
-      if (!strcmp(name,"filename"))
+      if (!strcmp(name,"filename") && !info->counted_cur_inst) {
 	info->kit_info->inst_count++;
+	info->counted_cur_inst = 1;
+      }
     }
     else {
       if (!strcmp(name,"id"))
@@ -117,10 +150,28 @@ endElement(void *userData, const char *name)
 
   info->cur_off = 0;
 
-  if (!info->scan_only && 
-      info->in_instrument && 
-      !strcmp(name,"instrument") && 
-      info->cur_instrument->filename) {
+  if (!info->scan_only &&
+      info->in_layer &&
+      !strcmp(name,"layer") &&
+      info->cur_layer->filename) {
+    struct instrument_layer *cur_l = info->cur_instrument->layers;
+    if (cur_l) {
+      while(cur_l->next) cur_l = cur_l->next;
+      cur_l->next = info->cur_layer;
+    } else
+      info->cur_instrument->layers = info->cur_layer;
+    info->cur_layer = NULL;
+    info->in_layer = 0;
+  }
+
+  if (info->scan_only && info->in_instrument && !strcmp(name,"instrument")) {
+    info->counted_cur_inst = 0;
+    info->in_instrument = 0;
+  }
+
+  if (!info->scan_only && info->in_instrument &&
+      (info->cur_instrument && (info->cur_instrument->filename || info->cur_instrument->layers)) &&
+      !strcmp(name,"instrument")) {
     struct instrument_info * cur_i = info->kit_info->instruments;
     if (cur_i) {
       while(cur_i->next) cur_i = cur_i->next;
