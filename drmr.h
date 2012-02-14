@@ -70,6 +70,7 @@ typedef enum {
   DRMR_LEFT,
   DRMR_RIGHT,
   DRMR_KITNUM,
+  DRMR_BASENOTE,
   DRMR_GAIN_ONE,
   DRMR_GAIN_TWO,
   DRMR_GAIN_THREE,
@@ -147,6 +148,7 @@ typedef struct {
   float** gains;
   float** pans;
   float* kitReq;
+  float* baseNote;
   double rate;
 
   // URIs

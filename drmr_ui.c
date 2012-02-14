@@ -31,6 +31,7 @@ typedef struct {
   GtkWidget *drmr_widget;
   GtkTable *sample_table;
   GtkComboBox *kit_combo;
+  GtkLabel *base_label;
   GtkListStore *kit_store;
   GtkWidget** gain_sliders;
   GtkWidget** pan_sliders;
@@ -122,12 +123,34 @@ static void fill_sample_table(DrMrUi* ui, int samples, GtkWidget** gain_sliders,
   }
 }
 
-void kit_combobox_changed(GtkComboBox* box, gpointer data) {
+static void kit_combobox_changed(GtkComboBox* box, gpointer data) {
   DrMrUi* ui = (DrMrUi*)data;
   gint new_kit = gtk_combo_box_get_active (GTK_COMBO_BOX(box));
   float fkit = (float)new_kit;
   if (ui->curKit != new_kit)
     ui->write(ui->controller,DRMR_KITNUM,4,0,&fkit);
+}
+
+static const char* nstrs = "C C#D D#E F F#G G#A A#B ";
+static char baseLabelBuf[32];
+static void setBaseLabel(int noteIdx) {
+  int oct = (noteIdx/12)-1;
+  int nmt = (noteIdx%12)*2;
+  snprintf(baseLabelBuf,32,"Midi Base Note <b>(%c%c%i)</b>:",
+	   nstrs[nmt],nstrs[nmt+1],oct);
+}
+
+static void base_changed(GtkSpinButton *base_spin, gpointer data) {
+  DrMrUi* ui = (DrMrUi*)data;
+  float base = (float)gtk_spin_button_get_value(base_spin);
+
+  if (base >= 21.0f && base <= 107.0f) {
+    setBaseLabel((int)base);
+    ui->write(ui->controller,DRMR_BASENOTE,4,0,&base);
+    gtk_label_set_markup(ui->base_label,baseLabelBuf);
+  }
+  else
+    fprintf(stderr,"Base spin got out of range: %f\n",base);
 }
 
 static void fill_kit_combo(GtkComboBox* combo, kits* kits) {
@@ -142,15 +165,16 @@ static void fill_kit_combo(GtkComboBox* combo, kits* kits) {
 
 static void build_drmr_ui(DrMrUi* ui) {
   GtkWidget *drmr_ui_widget;
-  GtkWidget *kit_hbox, *kit_combo_box, *kit_label;
+  GtkWidget *opts_hbox, *kit_combo_box, *kit_label, *base_label, *base_spin;
   GtkCellRenderer *cell_rend;
+  GtkAdjustment *base_adj;
   
   drmr_ui_widget = gtk_vbox_new(false,0);
   g_object_set(drmr_ui_widget,"border-width",6,NULL);
 
   ui->kit_store = gtk_list_store_new(1,G_TYPE_STRING);
 
-  kit_hbox = gtk_hbox_new(false,0);
+  opts_hbox = gtk_hbox_new(false,0);
   kit_combo_box = gtk_combo_box_new_with_model(GTK_TREE_MODEL(ui->kit_store));
   kit_label = gtk_label_new("Kit:");
 
@@ -158,19 +182,35 @@ static void build_drmr_ui(DrMrUi* ui) {
   gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(kit_combo_box), cell_rend, true);
   gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(kit_combo_box), cell_rend,"text",0,NULL);
 
-  gtk_box_pack_start(GTK_BOX(kit_hbox),kit_label,
+  base_label = gtk_label_new("Midi Base Note <b>(C 2)</b>:");
+  gtk_label_set_use_markup(GTK_LABEL(base_label),true);
+  base_adj = GTK_ADJUSTMENT
+    (gtk_adjustment_new(36.0, // val
+			21.0,107.0, // min/max
+			1.0, // step
+			5.0,5.0)); // page adj/size
+  base_spin = gtk_spin_button_new(base_adj, 1.0, 0);
+
+  gtk_box_pack_start(GTK_BOX(opts_hbox),kit_label,
 		     false,false,15);
-  gtk_box_pack_start(GTK_BOX(kit_hbox),kit_combo_box,
+  gtk_box_pack_start(GTK_BOX(opts_hbox),kit_combo_box,
 		     true,true,0);
-  gtk_box_pack_start(GTK_BOX(drmr_ui_widget),kit_hbox,
+  gtk_box_pack_start(GTK_BOX(opts_hbox),base_label,
+		     false,false,15);
+  gtk_box_pack_start(GTK_BOX(opts_hbox),base_spin,
+		     true,true,0);
+  gtk_box_pack_start(GTK_BOX(drmr_ui_widget),opts_hbox,
 		     false,false,5);
+
 
   ui->drmr_widget = drmr_ui_widget;
   ui->sample_table = NULL;
   ui->kit_combo = GTK_COMBO_BOX(kit_combo_box);
+  ui->base_label = GTK_LABEL(base_label);
 
 
   g_signal_connect(G_OBJECT(kit_combo_box),"changed",G_CALLBACK(kit_combobox_changed),ui);
+  g_signal_connect(G_OBJECT(base_spin),"value-changed",G_CALLBACK(base_changed),ui);
 
   gtk_widget_show_all(drmr_ui_widget);
 }

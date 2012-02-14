@@ -126,6 +126,8 @@ connect_port(LV2_Handle instance,
   case DRMR_KITNUM:
     if(data) drmr->kitReq = (float*)data;
     break;
+  case DRMR_BASENOTE:
+    if (data) drmr->baseNote = (float*)data;
   default:
     break;
   }
@@ -169,10 +171,11 @@ static inline void layer_to_sample(drmr_sample *sample, float gain) {
 #define DB_CO(g) ((g) > GAIN_MIN ? powf(10.0f, (g) * 0.05f) : 0.0f)
 
 static void run(LV2_Handle instance, uint32_t n_samples) {
-  int i,kitInt;
+  int i,kitInt,baseNote;
   DrMr* drmr = (DrMr*)instance;
 
   kitInt = (int)floorf(*(drmr->kitReq));
+  baseNote = (int)floorf(*(drmr->baseNote));
   if (kitInt != drmr->curKit) // requested a new kit
     pthread_cond_signal(&drmr->load_cond);
 
@@ -190,7 +193,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	  break;
 	case 9: {
 	  uint8_t nn = data[1];
-	  nn-=60; // middle c is our root note (setting?)
+	  nn-=baseNote;
 	  // need to mutex this to avoid getting the samples array
 	  // changed after the check that the midi-note is valid
 	  pthread_mutex_lock(&drmr->load_mutex); 
