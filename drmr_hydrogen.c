@@ -29,6 +29,16 @@
 #include "drmr_hydrogen.h"
 #include "expat.h"
 
+/* Below is a list of the locations that DrMr will
+ * search for drumkit files.  It will scan each sub-directory
+ * in these locations (non-recursive) for a drumkit.xml
+ * file, and if found, parse it and add it to the list
+ * of available kits.
+ *
+ * Strings that start with a ~ will be expanded to the HOME
+ * environment variable.  NB: only a ~ at the start of a string
+ * will be expanded, ones in the middle will be left in place.
+ */
 static char* default_drumkit_locations[] = {
   "/usr/share/hydrogen/data/drumkits/",
   "/usr/local/share/hydrogen/data/drumkits/",
@@ -38,6 +48,9 @@ static char* default_drumkit_locations[] = {
   NULL
 };
 
+// Quality of conversion for libsamplerate.
+// See http://www.mega-nerd.com/SRC/api_misc.html#Converters
+// for info about availble qualities
 #define RATE_CONV_QUALITY SRC_SINC_MEDIUM_QUALITY
 
 #define MAX_CHAR_DATA 512
@@ -211,6 +224,25 @@ struct kit_list {
   struct kit_list* next;
 };
 
+// see note above at default_drumkit_locations
+// for how this function works
+static char* expand_path(char* path, char* buf) {
+  char *home_dir;
+  int n;
+  if (*path != '~') return path;
+  home_dir = getenv("HOME");
+  if (!home_dir) {
+    fprintf(stderr,"Home dir not set, can't expand ~ paths\n");
+    return 0;
+  }
+  n = snprintf(buf,BUFSIZ,"%s%s",home_dir,path+1);
+  if (n >= BUFSIZ) {
+    fprintf(stderr,"Path too long for buffer, can't expand: %s\n",path);
+    return 0;
+  }
+  return buf;
+}
+
 kits* scan_kits() {
   DIR* dp;
   FILE* file;
@@ -228,6 +260,11 @@ kits* scan_kits() {
   ret->num_kits = 0;
 
   while (cur_path) {
+    cur_path = expand_path(cur_path,buf);
+    if (!cur_path) {
+      cur_path = default_drumkit_locations[cp++];
+      continue;
+    }
     dp = opendir (cur_path);
     if (dp != NULL) {
       while (ep = readdir (dp)) {
