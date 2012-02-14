@@ -147,6 +147,7 @@ typedef struct {
   float** gains;
   float** pans;
   float* kitReq;
+  double rate;
 
   // URIs
   LV2_URI_Map_Feature* map;

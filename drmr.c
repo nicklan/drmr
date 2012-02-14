@@ -52,6 +52,7 @@ instantiate(const LV2_Descriptor*     descriptor,
   DrMr* drmr = malloc(sizeof(DrMr));
   drmr->map = NULL;
   drmr->num_samples = 0;
+  drmr->rate = rate;
 
   if (pthread_mutex_init(&drmr->load_mutex, 0)) {
     fprintf(stderr, "Could not initialize load_mutex.\n");

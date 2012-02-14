@@ -22,7 +22,9 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <errno.h>
+#include <math.h>
 
+#include "samplerate.h"
 #include "drmr.h"
 #include "drmr_hydrogen.h"
 #include "expat.h"
@@ -35,6 +37,8 @@ static char* default_drumkit_locations[] = {
   "~/.drmr/drumkits/",
   NULL
 };
+
+#define RATE_CONV_QUALITY SRC_SINC_MEDIUM_QUALITY
 
 #define MAX_CHAR_DATA 512
 
@@ -339,9 +343,9 @@ void free_kits(kits* kits) {
   free(kits);
 }
 
-int load_sample(char* path, drmr_layer* layer) {
+int load_sample(char* path, drmr_layer* layer, double target_rate) {
   SNDFILE* sndf;
-  int size;
+  long size;
   
   //printf("Loading: %s\n",path);
 
@@ -360,6 +364,7 @@ int load_sample(char* path, drmr_layer* layer) {
     free(layer->info);
     return 1;
   }
+
   size = layer->info->frames * layer->info->channels;
   layer->limit = size;
   layer->data = malloc(size*sizeof(float));
@@ -371,6 +376,41 @@ int load_sample(char* path, drmr_layer* layer) {
 
   sf_read_float(sndf,layer->data,size);
   sf_close(sndf); 
+
+  // convert rate if needed
+  if (layer->info->samplerate != target_rate) {
+    SRC_DATA src_data;
+    int stat;
+    double ratio = (target_rate/layer->info->samplerate);
+    long out_frames = (long)ceil(layer->info->frames * ratio);
+    long out_size = out_frames*layer->info->channels;
+    float *data_out = malloc(sizeof(float)*out_size);
+
+    src_data.data_in = layer->data;
+    src_data.input_frames = layer->info->frames;
+    src_data.data_out = data_out;
+    src_data.output_frames = out_frames;
+    src_data.src_ratio = ratio;
+
+    stat = src_simple(&src_data,RATE_CONV_QUALITY,layer->info->channels);
+    if (stat) {
+      fprintf(stderr,"Failed to convert rate for %s: %s.  Using original rate\n",
+	      path,src_strerror(stat));
+      free(data_out);
+      return 0;
+    }
+
+    if (src_data.input_frames_used != layer->info->frames)
+      fprintf(stderr,"Didn't consume all input frames. used: %i  had: %i  gened: %i\n",
+	      src_data.input_frames_used, layer->info->frames,src_data.output_frames_gen);
+
+    free(layer->data);
+
+    layer->data = data_out;
+    layer->limit = src_data.output_frames_gen*layer->info->channels;
+    layer->info->samplerate = target_rate;
+    layer->info->frames = src_data.output_frames_gen;
+  }
   return 0;
 }
 
@@ -435,7 +475,7 @@ int load_hydrogen_kit(DrMr* drmr, char* path) {
 	layer->min = 0;
 	layer->max = 1;
 	snprintf(buf,BUFSIZ,"%s/%s",path,cur_i->filename);
-	if (load_sample(buf,layer)) {
+	if (load_sample(buf,layer,drmr->rate)) {
 	  fprintf(stderr,"Could not load sample: %s\n",buf);
 	  // set limit to zero, will never try and play
 	  layer->info = NULL;
@@ -463,7 +503,7 @@ int load_hydrogen_kit(DrMr* drmr, char* path) {
 	j = 0;
 	while(cur_l) {
 	  snprintf(buf,BUFSIZ,"%s/%s",path,cur_l->filename);
-	  if (load_sample(buf,samples[i].layers+j)) {
+	  if (load_sample(buf,samples[i].layers+j,drmr->rate)) {
 	    fprintf(stderr,"Could not load sample: %s\n",buf);
 	    // set limit to zero, will never try and play
 	    samples[i].layers[j].info = NULL;
