@@ -150,7 +150,7 @@ static inline void layer_to_sample(drmr_sample *sample, float gain) {
   for(i = 0;i < sample->layer_count;i++) {
     if (sample->layers[i].min <= mapped_gain &&
 	(sample->layers[i].max > mapped_gain ||
-	 sample->layers[i].max == 1 && mapped_gain == 1)) {
+	 (sample->layers[i].max == 1 && mapped_gain == 1))) {
       sample->limit = sample->layers[i].limit;
       sample->info = sample->layers[i].info;
       sample->data = sample->layers[i].data;
@@ -186,7 +186,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
     while (lv2_event_is_valid(&eit)) {
       cur_ev = lv2_event_get(&eit,&data);
       if (cur_ev->type == drmr->uris.midi_event) {
-	int channel = *data & 15;
+	//int channel = *data & 15;
 	switch ((*data) >> 4) {
 	case 8:  // ignore note-offs for now, should probably be a setting
 	  //if (drmr->cur_samp) drmr->cur_samp->active = 0;

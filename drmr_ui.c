@@ -224,7 +224,6 @@ instantiate(const LV2UI_Descriptor*   descriptor,
             LV2UI_Widget*             widget,
             const LV2_Feature* const* features) {
   DrMrUi     *ui = (DrMrUi*)malloc(sizeof(DrMrUi));
-  int i;
 
   ui->write      = write_function;
   ui->controller = controller;

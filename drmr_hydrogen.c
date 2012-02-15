@@ -254,7 +254,7 @@ kits* scan_kits() {
   int cp = 0;
   char* cur_path = default_drumkit_locations[cp++];
   kits* ret = malloc(sizeof(kits));
-  struct kit_list* scanned_kits = NULL,*cur_kit;
+  struct kit_list* scanned_kits = NULL;
   char buf[BUFSIZ], path_buf[BUFSIZ];
 
   ret->num_kits = 0;
@@ -267,7 +267,7 @@ kits* scan_kits() {
     }
     dp = opendir (cur_path);
     if (dp != NULL) {
-      while (ep = readdir (dp)) {
+      while ((ep = readdir (dp))) {
 	if (ep->d_name[0]=='.') continue;
 	if (snprintf(buf,BUFSIZ,"%s/%s/drumkit.xml",cur_path,ep->d_name) >= BUFSIZ) {
 	  fprintf(stderr,"Warning: Skipping scan of %s as path name is too long\n",cur_path);
@@ -438,7 +438,7 @@ int load_sample(char* path, drmr_layer* layer, double target_rate) {
     }
 
     if (src_data.input_frames_used != layer->info->frames)
-      fprintf(stderr,"Didn't consume all input frames. used: %i  had: %i  gened: %i\n",
+      fprintf(stderr,"Didn't consume all input frames. used: %li  had: %li  gened: %li\n",
 	      src_data.input_frames_used, layer->info->frames,src_data.output_frames_gen);
 
     free(layer->data);
@@ -452,7 +452,6 @@ int load_sample(char* path, drmr_layer* layer, double target_rate) {
 }
 
 int load_hydrogen_kit(DrMr* drmr, char* path) {
-  char* fp_buf;
   FILE* file;
   char buf[BUFSIZ];
   XML_Parser parser;

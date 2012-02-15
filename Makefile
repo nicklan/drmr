@@ -8,10 +8,10 @@ $(BUNDLE): manifest.ttl drmr.ttl drmr.so drmr_ui.so
 	cp manifest.ttl drmr.ttl drmr.so drmr_ui.so $(BUNDLE)
 
 drmr.so: drmr.c drmr_hydrogen.c
-	$(CC) -shared -fPIC -DPIC drmr.c drmr_hydrogen.c `pkg-config --cflags --libs lv2-plugin sndfile samplerate` -lexpat -lm -o drmr.so
+	$(CC) -shared -Wall -fPIC -DPIC drmr.c drmr_hydrogen.c `pkg-config --cflags --libs lv2-plugin sndfile samplerate` -lexpat -lm -o drmr.so
 
 drmr_ui.so: drmr_ui.c drmr_hydrogen.c
-	$(CC) -shared -fPIC -DPIC drmr_ui.c drmr_hydrogen.c `pkg-config --cflags --libs lv2-plugin gtk+-2.0 sndfile samplerate` -lexpat -lm -o drmr_ui.so
+	$(CC) -shared -Wall -fPIC -DPIC drmr_ui.c drmr_hydrogen.c `pkg-config --cflags --libs lv2-plugin gtk+-2.0 sndfile samplerate` -lexpat -lm -o drmr_ui.so
 
 install: $(BUNDLE)
 	mkdir -p $(INSTALL_DIR)
