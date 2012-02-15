@@ -255,12 +255,12 @@ kits* scan_kits() {
   char* cur_path = default_drumkit_locations[cp++];
   kits* ret = malloc(sizeof(kits));
   struct kit_list* scanned_kits = NULL,*cur_kit;
-  char buf[BUFSIZ];
+  char buf[BUFSIZ], path_buf[BUFSIZ];
 
   ret->num_kits = 0;
 
   while (cur_path) {
-    cur_path = expand_path(cur_path,buf);
+    cur_path = expand_path(cur_path,path_buf);
     if (!cur_path) {
       cur_path = default_drumkit_locations[cp++];
       continue;
