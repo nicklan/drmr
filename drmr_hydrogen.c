@@ -451,13 +451,16 @@ int load_sample(char* path, drmr_layer* layer, double target_rate) {
   return 0;
 }
 
-int load_hydrogen_kit(DrMr* drmr, char* path) {
+drmr_sample* load_hydrogen_kit(char *path, double rate, int *num_samples) {
   FILE* file;
   char buf[BUFSIZ];
   XML_Parser parser;
   int done;
   struct hp_info info;
   struct kit_info kit_info;
+  drmr_sample *samples;
+  struct instrument_info * cur_i;
+  int i = 0, num_inst = 0;
 
   snprintf(buf,BUFSIZ,"%s/drumkit.xml",path);
   
@@ -466,7 +469,7 @@ int load_hydrogen_kit(DrMr* drmr, char* path) {
   file = fopen(buf,"r");
   if (!file) {
     perror("Unable to open file:");
-    return 1;
+    return NULL;
   }
 
   parser = XML_ParserCreate(NULL);
@@ -487,88 +490,71 @@ int load_hydrogen_kit(DrMr* drmr, char* path) {
               "%s at line %lu\n",
               XML_ErrorString(XML_GetErrorCode(parser)),
               XML_GetCurrentLineNumber(parser));
-      return 1;
+      return NULL;
     }
   } while (!done);
   XML_ParserFree(parser);
 
-  {
-    drmr_sample *samples, *old_samples;
-    struct instrument_info * cur_i;
-    int i = 0, num_inst = 0, old_scount;
-    printf("Read kit: %s\n",kit_info.name);
-    cur_i = kit_info.instruments;
-    while(cur_i) { // first count how many samples we have
-      num_inst ++;
-      cur_i = cur_i->next;
-    }
-    printf("Loading %i instruments\n",num_inst);
-    samples = malloc(num_inst*sizeof(drmr_sample));
-    cur_i = kit_info.instruments;
-    while(cur_i) {
-      if (cur_i->filename) { // top level filename, just make one dummy layer
-	drmr_layer *layer = malloc(sizeof(drmr_layer));
-	layer->min = 0;
-	layer->max = 1;
-	snprintf(buf,BUFSIZ,"%s/%s",path,cur_i->filename);
-	if (load_sample(buf,layer,drmr->rate)) {
+  printf("Read kit: %s\n",kit_info.name);
+  cur_i = kit_info.instruments;
+  while(cur_i) { // first count how many samples we have
+    num_inst ++;
+    cur_i = cur_i->next;
+  }
+  printf("Loading %i instruments\n",num_inst);
+  samples = malloc(num_inst*sizeof(drmr_sample));
+  cur_i = kit_info.instruments;
+  while(cur_i) {
+    if (cur_i->filename) { // top level filename, just make one dummy layer
+      drmr_layer *layer = malloc(sizeof(drmr_layer));
+      layer->min = 0;
+      layer->max = 1;
+      snprintf(buf,BUFSIZ,"%s/%s",path,cur_i->filename);
+      if (load_sample(buf,layer,rate)) {
+	fprintf(stderr,"Could not load sample: %s\n",buf);
+	// set limit to zero, will never try and play
+	layer->info = NULL;
+	layer->limit = 0;
+	layer->data = NULL;
+      }
+      samples[i].layer_count = 0;
+      samples[i].layers = NULL;
+      samples[i].offset = 0;
+      samples[i].info = layer->info;
+      samples[i].limit = layer->limit;
+      samples[i].data = layer->data;
+      free(layer);
+    } else {
+      int layer_count = 0;
+      int j;
+      struct instrument_layer *cur_l = cur_i->layers;
+      while(cur_l) {
+	layer_count++;
+	cur_l = cur_l->next;
+      }
+      samples[i].layer_count = layer_count;
+      samples[i].layers = malloc(sizeof(drmr_layer)*layer_count);
+      cur_l = cur_i->layers;
+      j = 0;
+      while(cur_l) {
+	snprintf(buf,BUFSIZ,"%s/%s",path,cur_l->filename);
+	if (load_sample(buf,samples[i].layers+j,rate)) {
 	  fprintf(stderr,"Could not load sample: %s\n",buf);
 	  // set limit to zero, will never try and play
-	  layer->info = NULL;
-	  layer->limit = 0;
-	  layer->data = NULL;
+	  samples[i].layers[j].info = NULL;
+	  samples[i].layers[j].limit = 0;
+	  samples[i].layers[j].data = NULL;
 	}
-	samples[i].layer_count = 0;
-	samples[i].layers = NULL;
-	samples[i].offset = 0;
-	samples[i].info = layer->info;
-	samples[i].limit = layer->limit;
-	samples[i].data = layer->data;
-	free(layer);
-      } else {
-	int layer_count = 0;
-	int j;
-	struct instrument_layer *cur_l = cur_i->layers;
-	while(cur_l) {
-	  layer_count++;
-	  cur_l = cur_l->next;
-	}
-	samples[i].layer_count = layer_count;
-	samples[i].layers = malloc(sizeof(drmr_layer)*layer_count);
-	cur_l = cur_i->layers;
-	j = 0;
-	while(cur_l) {
-	  snprintf(buf,BUFSIZ,"%s/%s",path,cur_l->filename);
-	  if (load_sample(buf,samples[i].layers+j,drmr->rate)) {
-	    fprintf(stderr,"Could not load sample: %s\n",buf);
-	    // set limit to zero, will never try and play
-	    samples[i].layers[j].info = NULL;
-	    samples[i].layers[j].limit = 0;
-	    samples[i].layers[j].data = NULL;
-	  }
-	  samples[i].layers[j].min = cur_l->min;
-	  samples[i].layers[j].max = cur_l->max;
-	  j++;
-	  cur_l = cur_l->next;
-	}
+	samples[i].layers[j].min = cur_l->min;
+	samples[i].layers[j].max = cur_l->max;
+	j++;
+	cur_l = cur_l->next;
       }
-      samples[i].active = 0;
-      i++;
-      cur_i = cur_i->next;
     }
-    old_samples = drmr->samples;
-    old_scount = drmr->num_samples;
-    if (num_inst > drmr->num_samples) { 
-      // we have more, so we can safely swap our sample list in before updating num_samples
-      drmr->samples = samples;
-      drmr->num_samples = num_inst;
-    } else {
-      // previous has more, update count first
-      drmr->num_samples = num_inst;
-      drmr->samples = samples;
-    }
-    if (old_samples) free_samples(old_samples,old_scount);
+    samples[i].active = 0;
+    i++;
+    cur_i = cur_i->next;
   }
-  return 0;
-  
+  *num_samples = num_inst;
+  return samples;
 }

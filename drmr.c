@@ -24,22 +24,34 @@
 
 static void* load_thread(void* arg) {
   DrMr* drmr = (DrMr*)arg;
-
-  pthread_mutex_lock(&drmr->load_mutex);
+  drmr_sample *loaded_samples,*old_samples;
+  int loaded_count, old_scount;
   for(;;) {
+    pthread_mutex_lock(&drmr->load_mutex);
     pthread_cond_wait(&drmr->load_cond,
 		      &drmr->load_mutex);
+    pthread_mutex_unlock(&drmr->load_mutex); 
     int request = (int)floorf(*(drmr->kitReq));
-    if (request >= drmr->kits->num_kits) {
-      int os = drmr->num_samples;
+    if (request == drmr->curKit) continue;
+    old_samples = drmr->samples;
+    old_scount = drmr->num_samples;
+    if (request < 0 || request >= drmr->kits->num_kits) {
+      pthread_mutex_lock(&drmr->load_mutex);
       drmr->num_samples = 0;
-      if (os > 0) free_samples(drmr->samples,os);
       drmr->samples = NULL;
-    } else
-      load_hydrogen_kit(drmr,drmr->kits->kits[request].path);
+      pthread_mutex_unlock(&drmr->load_mutex); 
+    } else {
+      printf("loading kit: %i\n",request);
+      loaded_samples = load_hydrogen_kit(drmr->kits->kits[request].path,drmr->rate,&loaded_count);
+      // just lock for the critical moment when we swap in the new kit
+      pthread_mutex_lock(&drmr->load_mutex);
+      drmr->samples = loaded_samples;
+      drmr->num_samples = loaded_count;
+      pthread_mutex_unlock(&drmr->load_mutex); 
+    }
+    if (old_scount > 0) free_samples(old_samples,old_scount);
     drmr->curKit = request;
   }
-  pthread_mutex_unlock(&drmr->load_mutex);
   return 0;
 }
 
@@ -51,7 +63,9 @@ instantiate(const LV2_Descriptor*     descriptor,
   int i;
   DrMr* drmr = malloc(sizeof(DrMr));
   drmr->map = NULL;
+  drmr->samples = NULL;
   drmr->num_samples = 0;
+  drmr->curKit = -1;
   drmr->rate = rate;
 
   if (pthread_mutex_init(&drmr->load_mutex, 0)) {
@@ -61,11 +75,6 @@ instantiate(const LV2_Descriptor*     descriptor,
   }
   if (pthread_cond_init(&drmr->load_cond, 0)) {
     fprintf(stderr, "Could not initialize load_cond.\n");
-    free(drmr);
-    return 0;
-  }
-  if (pthread_create(&drmr->load_thread, 0, load_thread, drmr)) {
-    fprintf(stderr, "Could not initialize loading thread.\n");
     free(drmr);
     return 0;
   }
@@ -93,9 +102,12 @@ instantiate(const LV2_Descriptor*     descriptor,
     free(drmr);
     return 0;
   }
-  drmr->samples = NULL; // prevent attempted freeing in load
-  load_hydrogen_kit(drmr,drmr->kits->kits->path);
-  drmr->curKit = 0;
+
+  if (pthread_create(&drmr->load_thread, 0, load_thread, drmr)) {
+    fprintf(stderr, "Could not initialize loading thread.\n");
+    free(drmr);
+    return 0;
+  }
 
   drmr->gains = malloc(32*sizeof(float*));
   drmr->pans = malloc(32*sizeof(float*));

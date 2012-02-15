@@ -31,6 +31,7 @@ typedef struct {
   GtkWidget *drmr_widget;
   GtkTable *sample_table;
   GtkComboBox *kit_combo;
+  GtkSpinButton *base_spin;
   GtkLabel *base_label;
   GtkListStore *kit_store;
   GtkWidget** gain_sliders;
@@ -42,6 +43,7 @@ typedef struct {
   GQuark gain_quark, pan_quark;
 
   int curKit;
+  int kitReq;
   kits* kits;
 } DrMrUi;
 
@@ -188,7 +190,7 @@ static void build_drmr_ui(DrMrUi* ui) {
     (gtk_adjustment_new(36.0, // val
 			21.0,107.0, // min/max
 			1.0, // step
-			5.0,5.0)); // page adj/size
+			5.0,0.0)); // page adj/size
   base_spin = gtk_spin_button_new(base_adj, 1.0, 0);
 
   gtk_box_pack_start(GTK_BOX(opts_hbox),kit_label,
@@ -207,6 +209,7 @@ static void build_drmr_ui(DrMrUi* ui) {
   ui->sample_table = NULL;
   ui->kit_combo = GTK_COMBO_BOX(kit_combo_box);
   ui->base_label = GTK_LABEL(base_label);
+  ui->base_spin = GTK_SPIN_BUTTON(base_spin);
 
 
   g_signal_connect(G_OBJECT(kit_combo_box),"changed",G_CALLBACK(kit_combobox_changed),ui);
@@ -257,6 +260,60 @@ static void cleanup(LV2UI_Handle handle) {
   free(ui);
 }
 
+struct slider_callback_data {
+  GtkRange* range;
+  float val;
+};
+static gboolean slider_callback(gpointer data) {
+  struct slider_callback_data *cbd = (struct slider_callback_data*)data;
+  gtk_range_set_value(cbd->range,cbd->val);
+  free(cbd);
+  return FALSE; // don't keep calling
+}
+
+static gboolean idle = FALSE;
+static gboolean kit_callback(gpointer data) {
+  DrMrUi* ui = (DrMrUi*)data;
+  if (ui->kitReq != ui->curKit) {
+    int samples = (ui->kitReq<ui->kits->num_kits && ui->kitReq >= 0)?
+      ui->kits->kits[ui->kitReq].samples:
+      0;
+    GtkWidget** gain_sliders;
+    GtkWidget** pan_sliders;
+    if (ui->sample_table) {
+      gain_sliders = ui->gain_sliders;
+      pan_sliders = ui->pan_sliders;
+      ui->gain_sliders = NULL;
+      ui->pan_sliders = NULL;
+      if (gain_sliders) free(gain_sliders);
+      if (pan_sliders) free(pan_sliders);
+      gtk_widget_destroy(GTK_WIDGET(ui->sample_table));
+      ui->sample_table = NULL;
+    }
+    if (samples > 0) {
+      ui->sample_table = GTK_TABLE(gtk_table_new(1,1,true));
+      gtk_table_set_col_spacings(ui->sample_table,5);
+      gtk_table_set_row_spacings(ui->sample_table,5);
+      
+      gain_sliders = malloc(samples*sizeof(GtkWidget*));
+      pan_sliders = malloc(samples*sizeof(GtkWidget*));
+      fill_sample_table(ui,samples,gain_sliders,pan_sliders);
+      gtk_box_pack_start(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),
+			 true,true,5);
+      gtk_box_reorder_child(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),0);
+      gtk_widget_show_all(GTK_WIDGET(ui->sample_table));
+      ui->samples = samples;
+      ui->gain_sliders = gain_sliders;
+      ui->pan_sliders = pan_sliders;
+      
+      ui->curKit = ui->kitReq;
+      gtk_combo_box_set_active(ui->kit_combo,ui->curKit);
+    }
+  }
+  idle = FALSE;
+  return FALSE; // don't keep calling
+}
+
 static void
 port_event(LV2UI_Handle handle,
            uint32_t     port_index,
@@ -271,31 +328,19 @@ port_event(LV2UI_Handle handle,
       fprintf(stderr,"Invalid format for kitnum: %i\n",format);
     else {
       int kit = (int)(*((float*)buffer));
-      int samples = ui->kits->kits[kit].samples;
-      GtkWidget** gain_sliders;
-      GtkWidget** pan_sliders;
-      if (ui->sample_table) {
-	ui->gain_sliders = NULL;
-	ui->pan_sliders = NULL;
-	gtk_widget_destroy(GTK_WIDGET(ui->sample_table));
+      ui->kitReq = kit;
+      if (!idle) {
+	idle = TRUE;
+	g_idle_add(kit_callback,ui);
       }
-      ui->sample_table = GTK_TABLE(gtk_table_new(1,1,true));
-      gtk_table_set_col_spacings(ui->sample_table,5);
-      gtk_table_set_row_spacings(ui->sample_table,5);
-      ui->curKit = kit;
-      if (ui->gain_sliders) free(ui->gain_sliders);
-      if (ui->pan_sliders) free(ui->pan_sliders);
-      gain_sliders = malloc(samples*sizeof(GtkWidget*));
-      pan_sliders = malloc(samples*sizeof(GtkWidget*));
-      fill_sample_table(ui,samples,gain_sliders,pan_sliders);
-      gtk_box_pack_start(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),
-			 true,true,5);
-      gtk_box_reorder_child(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),0);
-      gtk_widget_show_all(GTK_WIDGET(ui->sample_table));
-      gtk_combo_box_set_active(ui->kit_combo,kit);
-      ui->samples = samples;
-      ui->gain_sliders = gain_sliders;
-      ui->pan_sliders = pan_sliders;
+    }
+  }
+  else if (index == DRMR_BASENOTE) {
+    int base = (int)(*((float*)buffer));
+    if (base >= 21 && base <= 107) {
+      setBaseLabel((int)base);
+      gtk_spin_button_set_value(ui->base_spin,base);
+      gtk_label_set_markup(ui->base_label,baseLabelBuf);
     }
   }
   else if (index >= DRMR_GAIN_ONE &&
@@ -304,8 +349,12 @@ port_event(LV2UI_Handle handle,
       float gain = *(float*)buffer;
       int idx = index-DRMR_GAIN_ONE;
       if (idx < ui->samples) {
-	GtkRange* range = GTK_RANGE(ui->gain_sliders[idx]);
-	gtk_range_set_value(range,gain);
+	struct slider_callback_data* data = malloc(sizeof(struct slider_callback_data));
+	data->range = GTK_RANGE(ui->gain_sliders[idx]);
+	data->val = gain;
+	g_idle_add(slider_callback,data);
+	//GtkRange* range = GTK_RANGE(ui->gain_sliders[idx]);
+	//gtk_range_set_value(range,gain);
       }
     }
   }
@@ -315,8 +364,12 @@ port_event(LV2UI_Handle handle,
       float pan = *(float*)buffer;
       int idx = index-DRMR_PAN_ONE;
       if (idx < ui->samples) {
-	GtkRange* range = GTK_RANGE(ui->pan_sliders[idx]);
-	gtk_range_set_value(range,pan);
+	struct slider_callback_data* data = malloc(sizeof(struct slider_callback_data));
+	data->range = GTK_RANGE(ui->pan_sliders[idx]);
+	data->val = pan;
+	g_idle_add(slider_callback,data);
+	//GtkRange* range = GTK_RANGE(ui->pan_sliders[idx]);
+	//gtk_range_set_value(range,pan);
       }
     }
   }
