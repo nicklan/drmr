@@ -125,14 +125,6 @@ static void fill_sample_table(DrMrUi* ui, int samples, GtkWidget** gain_sliders,
   }
 }
 
-static void kit_combobox_changed(GtkComboBox* box, gpointer data) {
-  DrMrUi* ui = (DrMrUi*)data;
-  gint new_kit = gtk_combo_box_get_active (GTK_COMBO_BOX(box));
-  float fkit = (float)new_kit;
-  if (ui->curKit != new_kit)
-    ui->write(ui->controller,DRMR_KITNUM,4,0,&fkit);
-}
-
 static const char* nstrs = "C C#D D#E F F#G G#A A#B ";
 static char baseLabelBuf[32];
 static void setBaseLabel(int noteIdx) {
@@ -163,6 +155,66 @@ static void fill_kit_combo(GtkComboBox* combo, kits* kits) {
     gtk_list_store_append (store, &iter);
     gtk_list_store_set(store, &iter, 0, kits->kits[i].name, -1);
   }
+}
+
+static gboolean idle = FALSE;
+static gboolean kit_callback(gpointer data) {
+  DrMrUi* ui = (DrMrUi*)data;
+  if (ui->kitReq != ui->curKit) {
+    int samples = (ui->kitReq<ui->kits->num_kits && ui->kitReq >= 0)?
+      ui->kits->kits[ui->kitReq].samples:
+      0;
+    GtkWidget** gain_sliders;
+    GtkWidget** pan_sliders;
+    if (ui->sample_table) {
+      gain_sliders = ui->gain_sliders;
+      pan_sliders = ui->pan_sliders;
+      ui->gain_sliders = NULL;
+      ui->pan_sliders = NULL;
+      if (gain_sliders) free(gain_sliders);
+      if (pan_sliders) free(pan_sliders);
+      gtk_widget_destroy(GTK_WIDGET(ui->sample_table));
+      ui->sample_table = NULL;
+    }
+    if (samples > 0) {
+      ui->sample_table = GTK_TABLE(gtk_table_new(1,1,true));
+      gtk_table_set_col_spacings(ui->sample_table,5);
+      gtk_table_set_row_spacings(ui->sample_table,5);
+
+      gain_sliders = malloc(samples*sizeof(GtkWidget*));
+      pan_sliders = malloc(samples*sizeof(GtkWidget*));
+      fill_sample_table(ui,samples,gain_sliders,pan_sliders);
+      gtk_box_pack_start(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),
+			 true,true,5);
+      gtk_box_reorder_child(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),0);
+      gtk_widget_show_all(GTK_WIDGET(ui->sample_table));
+      ui->samples = samples;
+      ui->gain_sliders = gain_sliders;
+      ui->pan_sliders = pan_sliders;
+
+      ui->curKit = ui->kitReq;
+      gtk_combo_box_set_active(ui->kit_combo,ui->curKit);
+    }
+  }
+  idle = FALSE;
+  return FALSE; // don't keep calling
+}
+
+static void kit_combobox_changed(GtkComboBox* box, gpointer data) {
+  DrMrUi* ui = (DrMrUi*)data;
+  gint new_kit = gtk_combo_box_get_active (GTK_COMBO_BOX(box));
+  float fkit = (float)new_kit;
+  if (ui->curKit != new_kit)
+    ui->write(ui->controller,DRMR_KITNUM,4,0,&fkit);
+
+  /* Call our update func after 100 milliseconds.
+   *
+   * This is a hack to deal with hosts that don't send
+   * back port_events properly after the write function.
+   * In particular, qtractor doesn't, at the moment.
+   */
+  ui->kitReq = new_kit;
+  g_timeout_add(100,kit_callback,ui);
 }
 
 static void build_drmr_ui(DrMrUi* ui) {
@@ -268,49 +320,6 @@ static gboolean slider_callback(gpointer data) {
   struct slider_callback_data *cbd = (struct slider_callback_data*)data;
   gtk_range_set_value(cbd->range,cbd->val);
   free(cbd);
-  return FALSE; // don't keep calling
-}
-
-static gboolean idle = FALSE;
-static gboolean kit_callback(gpointer data) {
-  DrMrUi* ui = (DrMrUi*)data;
-  if (ui->kitReq != ui->curKit) {
-    int samples = (ui->kitReq<ui->kits->num_kits && ui->kitReq >= 0)?
-      ui->kits->kits[ui->kitReq].samples:
-      0;
-    GtkWidget** gain_sliders;
-    GtkWidget** pan_sliders;
-    if (ui->sample_table) {
-      gain_sliders = ui->gain_sliders;
-      pan_sliders = ui->pan_sliders;
-      ui->gain_sliders = NULL;
-      ui->pan_sliders = NULL;
-      if (gain_sliders) free(gain_sliders);
-      if (pan_sliders) free(pan_sliders);
-      gtk_widget_destroy(GTK_WIDGET(ui->sample_table));
-      ui->sample_table = NULL;
-    }
-    if (samples > 0) {
-      ui->sample_table = GTK_TABLE(gtk_table_new(1,1,true));
-      gtk_table_set_col_spacings(ui->sample_table,5);
-      gtk_table_set_row_spacings(ui->sample_table,5);
-      
-      gain_sliders = malloc(samples*sizeof(GtkWidget*));
-      pan_sliders = malloc(samples*sizeof(GtkWidget*));
-      fill_sample_table(ui,samples,gain_sliders,pan_sliders);
-      gtk_box_pack_start(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),
-			 true,true,5);
-      gtk_box_reorder_child(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),0);
-      gtk_widget_show_all(GTK_WIDGET(ui->sample_table));
-      ui->samples = samples;
-      ui->gain_sliders = gain_sliders;
-      ui->pan_sliders = pan_sliders;
-      
-      ui->curKit = ui->kitReq;
-      gtk_combo_box_set_active(ui->kit_combo,ui->curKit);
-    }
-  }
-  idle = FALSE;
   return FALSE; // don't keep calling
 }
 
