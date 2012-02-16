@@ -31,6 +31,7 @@ typedef struct {
   GtkWidget *drmr_widget;
   GtkTable *sample_table;
   GtkComboBox *kit_combo;
+  GtkWidget *no_kit_label;
   GtkSpinButton *base_spin;
   GtkLabel *base_label;
   GtkListStore *kit_store;
@@ -194,6 +195,11 @@ static gboolean kit_callback(gpointer data) {
 
       ui->curKit = ui->kitReq;
       gtk_combo_box_set_active(ui->kit_combo,ui->curKit);
+      gtk_widget_show(GTK_WIDGET(ui->kit_combo));
+      gtk_widget_hide(ui->no_kit_label);
+    } else {
+      gtk_widget_show(ui->no_kit_label);
+      gtk_widget_hide(GTK_WIDGET(ui->kit_combo));
     }
   }
   idle = FALSE;
@@ -219,7 +225,9 @@ static void kit_combobox_changed(GtkComboBox* box, gpointer data) {
 
 static void build_drmr_ui(DrMrUi* ui) {
   GtkWidget *drmr_ui_widget;
-  GtkWidget *opts_hbox, *kit_combo_box, *kit_label, *base_label, *base_spin;
+  GtkWidget *opts_hbox, 
+    *kit_combo_box, *kit_label, *no_kit_label,
+    *base_label, *base_spin;
   GtkCellRenderer *cell_rend;
   GtkAdjustment *base_adj;
   
@@ -231,6 +239,9 @@ static void build_drmr_ui(DrMrUi* ui) {
   opts_hbox = gtk_hbox_new(false,0);
   kit_combo_box = gtk_combo_box_new_with_model(GTK_TREE_MODEL(ui->kit_store));
   kit_label = gtk_label_new("Kit:");
+
+  no_kit_label = gtk_label_new("<b>No/Invalid Kit Selected</b>");
+  gtk_label_set_use_markup(GTK_LABEL(no_kit_label),true);
 
   cell_rend = gtk_cell_renderer_text_new();
   gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(kit_combo_box), cell_rend, true);
@@ -247,6 +258,8 @@ static void build_drmr_ui(DrMrUi* ui) {
 
   gtk_box_pack_start(GTK_BOX(opts_hbox),kit_label,
 		     false,false,15);
+  gtk_box_pack_start(GTK_BOX(opts_hbox),no_kit_label,
+		     true,true,0);
   gtk_box_pack_start(GTK_BOX(opts_hbox),kit_combo_box,
 		     true,true,0);
   gtk_box_pack_start(GTK_BOX(opts_hbox),base_label,
@@ -262,12 +275,13 @@ static void build_drmr_ui(DrMrUi* ui) {
   ui->kit_combo = GTK_COMBO_BOX(kit_combo_box);
   ui->base_label = GTK_LABEL(base_label);
   ui->base_spin = GTK_SPIN_BUTTON(base_spin);
-
+  ui->no_kit_label = no_kit_label;
 
   g_signal_connect(G_OBJECT(kit_combo_box),"changed",G_CALLBACK(kit_combobox_changed),ui);
   g_signal_connect(G_OBJECT(base_spin),"value-changed",G_CALLBACK(base_changed),ui);
 
   gtk_widget_show_all(drmr_ui_widget);
+  gtk_widget_hide(no_kit_label);
 }
 
 static LV2UI_Handle
