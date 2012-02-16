@@ -48,17 +48,17 @@ typedef struct {
   kits* kits;
 } DrMrUi;
 
-static void gain_callback(GtkRange* range, gpointer data) {
+static void gain_callback(GtkRange* range, GtkScrollType type, gdouble value, gpointer data) {
   DrMrUi* ui = (DrMrUi*)data;
   int gidx = GPOINTER_TO_INT(g_object_get_qdata(G_OBJECT(range),ui->gain_quark));
-  float gain = gtk_range_get_value(range);
+  float gain = (float)value;
   ui->write(ui->controller,gidx+DRMR_GAIN_ONE,4,0,&gain);
 }
 
-static void pan_callback(GtkRange* range, gpointer data) {
+static void pan_callback(GtkRange* range, GtkScrollType type, gdouble value, gpointer data) {
   DrMrUi* ui = (DrMrUi*)data;
   int pidx = GPOINTER_TO_INT(g_object_get_qdata(G_OBJECT(range),ui->pan_quark));
-  float pan = gtk_range_get_value(range);
+  float pan = (float)value;
   ui->write(ui->controller,pidx+DRMR_PAN_ONE,4,0,&pan);
 }
 
@@ -88,7 +88,7 @@ static void fill_sample_table(DrMrUi* ui, int samples, GtkWidget** gain_sliders,
     gtk_range_set_inverted(GTK_RANGE(gain_slider),true);
     gtk_scale_set_value_pos(GTK_SCALE(gain_slider),GTK_POS_BOTTOM);
     gtk_range_set_value(GTK_RANGE(gain_slider),0.0);
-    g_signal_connect(G_OBJECT(gain_slider),"value-changed",G_CALLBACK(gain_callback),ui);
+    g_signal_connect(G_OBJECT(gain_slider),"change-value",G_CALLBACK(gain_callback),ui);
     gtk_scale_set_digits(GTK_SCALE(gain_slider),1);
     gtk_scale_add_mark(GTK_SCALE(gain_slider),0.0,GTK_POS_RIGHT,"0 dB");
     // Hrmm, -inf label is at top in ardour for some reason
@@ -101,7 +101,7 @@ static void fill_sample_table(DrMrUi* ui, int samples, GtkWidget** gain_sliders,
     gtk_range_set_value(GTK_RANGE(pan_slider),0);
     g_object_set_qdata (G_OBJECT(pan_slider),ui->pan_quark,GINT_TO_POINTER(si));
     gtk_scale_add_mark(GTK_SCALE(pan_slider),0.0,GTK_POS_TOP,NULL);
-    g_signal_connect(G_OBJECT(pan_slider),"value-changed",G_CALLBACK(pan_callback),ui);
+    g_signal_connect(G_OBJECT(pan_slider),"change-value",G_CALLBACK(pan_callback),ui);
     pan_label = gtk_label_new("Pan");
     pan_vbox = gtk_vbox_new(false,0);
     
