@@ -84,11 +84,11 @@ static void fill_sample_table(DrMrUi* ui, int samples, GtkWidget** gain_sliders,
  
     gain_slider = gtk_vscale_new_with_range(GAIN_MIN,6.0,1.0);
     g_object_set_qdata (G_OBJECT(gain_slider),ui->gain_quark,GINT_TO_POINTER(si));
-    g_signal_connect(G_OBJECT(gain_slider),"value-changed",G_CALLBACK(gain_callback),ui);
     if (gain_sliders) gain_sliders[si] = gain_slider;
     gtk_range_set_inverted(GTK_RANGE(gain_slider),true);
     gtk_scale_set_value_pos(GTK_SCALE(gain_slider),GTK_POS_BOTTOM);
     gtk_range_set_value(GTK_RANGE(gain_slider),0.0);
+    g_signal_connect(G_OBJECT(gain_slider),"value-changed",G_CALLBACK(gain_callback),ui);
     gtk_scale_set_digits(GTK_SCALE(gain_slider),1);
     gtk_scale_add_mark(GTK_SCALE(gain_slider),0.0,GTK_POS_RIGHT,"0 dB");
     // Hrmm, -inf label is at top in ardour for some reason
