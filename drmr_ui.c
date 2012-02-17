@@ -50,18 +50,22 @@ typedef struct {
   kits* kits;
 } DrMrUi;
 
-static void gain_callback(GtkRange* range, GtkScrollType type, gdouble value, gpointer data) {
+static gboolean gain_callback(GtkRange* range, GtkScrollType type, gdouble value, gpointer data) {
   DrMrUi* ui = (DrMrUi*)data;
   int gidx = GPOINTER_TO_INT(g_object_get_qdata(G_OBJECT(range),ui->gain_quark));
   float gain = (float)value;
+  ui->gain_vals[gidx] = gain;
   ui->write(ui->controller,gidx+DRMR_GAIN_ONE,4,0,&gain);
+  return FALSE;
 }
 
-static void pan_callback(GtkRange* range, GtkScrollType type, gdouble value, gpointer data) {
+static gboolean pan_callback(GtkRange* range, GtkScrollType type, gdouble value, gpointer data) {
   DrMrUi* ui = (DrMrUi*)data;
   int pidx = GPOINTER_TO_INT(g_object_get_qdata(G_OBJECT(range),ui->pan_quark));
   float pan = (float)value;
+  ui->pan_vals[pidx] = pan;
   ui->write(ui->controller,pidx+DRMR_PAN_ONE,4,0,&pan);
+  return FALSE;
 }
 
 static void fill_sample_table(DrMrUi* ui, int samples, GtkWidget** gain_sliders, GtkWidget** pan_sliders) {
@@ -85,6 +89,7 @@ static void fill_sample_table(DrMrUi* ui, int samples, GtkWidget** gain_sliders,
     hbox = gtk_hbox_new(false,0);
  
     gain_slider = gtk_vscale_new_with_range(GAIN_MIN,6.0,1.0);
+    gtk_widget_set_size_request(gain_slider,-1,50);
     g_object_set_qdata (G_OBJECT(gain_slider),ui->gain_quark,GINT_TO_POINTER(si));
     if (gain_sliders) gain_sliders[si] = gain_slider;
     gtk_range_set_inverted(GTK_RANGE(gain_slider),true);
@@ -103,6 +108,7 @@ static void fill_sample_table(DrMrUi* ui, int samples, GtkWidget** gain_sliders,
     gain_vbox = gtk_vbox_new(false,0);
 
     pan_slider = gtk_hscale_new_with_range(-1.0,1.0,0.1);
+    gtk_widget_set_size_request(pan_slider,50,-1);
     if (pan_sliders) pan_sliders[si] = pan_slider;
     if (si < 32)
       gtk_range_set_value(GTK_RANGE(pan_slider),ui->pan_vals[si]);
@@ -133,6 +139,7 @@ static void fill_sample_table(DrMrUi* ui, int samples, GtkWidget** gain_sliders,
       row++;
     }
   }
+  gtk_widget_queue_resize(GTK_WIDGET(ui->sample_table));
 }
 
 static const char* nstrs = "C C#D D#E F F#G G#A A#B ";
@@ -321,7 +328,9 @@ instantiate(const LV2UI_Descriptor*   descriptor,
   // store previous gain/pan vals to re-apply to sliders when we
   // change kits
   ui->gain_vals = malloc(32*sizeof(float));
+  memset(ui->gain_vals,0,32*sizeof(float));
   ui->pan_vals  = malloc(32*sizeof(float));
+  memset(ui->pan_vals,0,32*sizeof(float));
   ui->cols = 4;
   fill_kit_combo(ui->kit_combo, ui->kits);
 
