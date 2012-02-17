@@ -37,6 +37,8 @@ typedef struct {
   GtkListStore *kit_store;
   GtkWidget** gain_sliders;
   GtkWidget** pan_sliders;
+  float *gain_vals,*pan_vals;
+
   int cols;
 
   int samples;
@@ -87,7 +89,11 @@ static void fill_sample_table(DrMrUi* ui, int samples, GtkWidget** gain_sliders,
     if (gain_sliders) gain_sliders[si] = gain_slider;
     gtk_range_set_inverted(GTK_RANGE(gain_slider),true);
     gtk_scale_set_value_pos(GTK_SCALE(gain_slider),GTK_POS_BOTTOM);
-    gtk_range_set_value(GTK_RANGE(gain_slider),0.0);
+
+    if (si < 32)
+      gtk_range_set_value(GTK_RANGE(gain_slider),ui->gain_vals[si]);
+    else // things are gross if we have > 32 samples, what to do?
+      gtk_range_set_value(GTK_RANGE(gain_slider),0.0);
     g_signal_connect(G_OBJECT(gain_slider),"change-value",G_CALLBACK(gain_callback),ui);
     gtk_scale_set_digits(GTK_SCALE(gain_slider),1);
     gtk_scale_add_mark(GTK_SCALE(gain_slider),0.0,GTK_POS_RIGHT,"0 dB");
@@ -98,7 +104,10 @@ static void fill_sample_table(DrMrUi* ui, int samples, GtkWidget** gain_sliders,
 
     pan_slider = gtk_hscale_new_with_range(-1.0,1.0,0.1);
     if (pan_sliders) pan_sliders[si] = pan_slider;
-    gtk_range_set_value(GTK_RANGE(pan_slider),0);
+    if (si < 32)
+      gtk_range_set_value(GTK_RANGE(pan_slider),ui->pan_vals[si]);
+    else
+      gtk_range_set_value(GTK_RANGE(pan_slider),0);
     g_object_set_qdata (G_OBJECT(pan_slider),ui->pan_quark,GINT_TO_POINTER(si));
     gtk_scale_add_mark(GTK_SCALE(pan_slider),0.0,GTK_POS_TOP,NULL);
     g_signal_connect(G_OBJECT(pan_slider),"change-value",G_CALLBACK(pan_callback),ui);
@@ -308,6 +317,11 @@ instantiate(const LV2UI_Descriptor*   descriptor,
   ui->pan_quark = g_quark_from_string("drmr_pan_quark");
   ui->gain_sliders = NULL;
   ui->pan_sliders = NULL;
+
+  // store previous gain/pan vals to re-apply to sliders when we
+  // change kits
+  ui->gain_vals = malloc(32*sizeof(float));
+  ui->pan_vals  = malloc(32*sizeof(float));
   ui->cols = 4;
   fill_kit_combo(ui->kit_combo, ui->kits);
 
@@ -371,6 +385,7 @@ port_event(LV2UI_Handle handle,
     if (ui->gain_sliders) {
       float gain = *(float*)buffer;
       int idx = index-DRMR_GAIN_ONE;
+      ui->gain_vals[idx] = gain;
       if (idx < ui->samples) {
 	struct slider_callback_data* data = malloc(sizeof(struct slider_callback_data));
 	data->range = GTK_RANGE(ui->gain_sliders[idx]);
@@ -386,6 +401,7 @@ port_event(LV2UI_Handle handle,
     if (ui->pan_sliders) {
       float pan = *(float*)buffer;
       int idx = index-DRMR_PAN_ONE;
+      ui->pan_vals[idx] = pan;
       if (idx < ui->samples) {
 	struct slider_callback_data* data = malloc(sizeof(struct slider_callback_data));
 	data->range = GTK_RANGE(ui->pan_sliders[idx]);
