@@ -459,7 +459,7 @@ drmr_sample* load_hydrogen_kit(char *path, double rate, int *num_samples) {
   struct hp_info info;
   struct kit_info kit_info;
   drmr_sample *samples;
-  struct instrument_info * cur_i;
+  struct instrument_info * cur_i, *i_to_free;
   int i = 0, num_inst = 0;
 
   snprintf(buf,BUFSIZ,"%s/drumkit.xml",path);
@@ -552,8 +552,18 @@ drmr_sample* load_hydrogen_kit(char *path, double rate, int *num_samples) {
       }
     }
     samples[i].active = 0;
-    i++;
+    i_to_free = cur_i;
     cur_i = cur_i->next;
+
+    if (i_to_free->name) free(i_to_free->name);
+    if (i_to_free->filename) free(i_to_free->filename);
+    if (samples[i].layer_count > 0) {
+      int j;
+      for(j = 0;j < samples[i].layer_count;j++)
+	free(i_to_free->layers[j].filename);
+    }
+    free(i_to_free);
+    i++;
   }
   if (kit_info.name) free(kit_info.name);
   *num_samples = num_inst;
