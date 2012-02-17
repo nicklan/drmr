@@ -555,6 +555,7 @@ drmr_sample* load_hydrogen_kit(char *path, double rate, int *num_samples) {
     i++;
     cur_i = cur_i->next;
   }
+  if (kit_info.name) free(kit_info.name);
   *num_samples = num_inst;
   return samples;
 }
