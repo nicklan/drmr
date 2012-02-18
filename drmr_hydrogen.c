@@ -558,9 +558,11 @@ drmr_sample* load_hydrogen_kit(char *path, double rate, int *num_samples) {
     if (i_to_free->name) free(i_to_free->name);
     if (i_to_free->filename) free(i_to_free->filename);
     if (samples[i].layer_count > 0) {
-      int j;
-      for(j = 0;j < samples[i].layer_count;j++)
-	free(i_to_free->layers[j].filename);
+      struct instrument_layer *ltf = i_to_free->layers;
+      while (ltf) {
+	free(ltf->filename);
+	ltf = ltf->next;
+      }
     }
     free(i_to_free);
     i++;
