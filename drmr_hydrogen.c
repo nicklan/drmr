@@ -571,3 +571,17 @@ drmr_sample* load_hydrogen_kit(char *path, double rate, int *num_samples) {
   *num_samples = num_inst;
   return samples;
 }
+
+#ifdef _TEST_HYDROGEN_PARSER
+
+int main(int argc, char* argv[]) {
+  kits *kits;
+  int i;
+  kits = scan_kits();
+  for (i=0;i<kits->num_kits;i++)
+    printf("\t%s:\n\t\tpath: %s\n\t\tsamples: %i\n",kits->kits[i].name,kits->kits[i].path,kits->kits[i].samples);
+
+  return 0;
+}
+
+#endif // _TEST_HYDROGEN_PARSER

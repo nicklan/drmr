@@ -13,6 +13,9 @@ drmr.so: drmr.c drmr_hydrogen.c
 drmr_ui.so: drmr_ui.c drmr_hydrogen.c
 	$(CC) -shared -Wall -fPIC -DPIC drmr_ui.c drmr_hydrogen.c `pkg-config --cflags --libs lv2-plugin gtk+-2.0 sndfile samplerate` -lexpat -lm -o drmr_ui.so
 
+htest: drmr_hydrogen.c
+	$(CC) -D_TEST_HYDROGEN_PARSER -Wall -fPIC -DPIC drmr_hydrogen.c `pkg-config --cflags --libs sndfile samplerate` -lexpat -lm -o htest
+
 install: $(BUNDLE)
 	mkdir -p $(INSTALL_DIR)
 	rm -rf $(INSTALL_DIR)/$(BUNDLE)
