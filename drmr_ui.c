@@ -68,7 +68,7 @@ static gboolean pan_callback(GtkRange* range, GtkScrollType type, gdouble value,
   return FALSE;
 }
 
-static void fill_sample_table(DrMrUi* ui, int samples, GtkWidget** gain_sliders, GtkWidget** pan_sliders) {
+static void fill_sample_table(DrMrUi* ui, int samples, char** names,GtkWidget** gain_sliders, GtkWidget** pan_sliders) {
   int row = 0;
   int col = 0;
   int si;
@@ -81,7 +81,7 @@ static void fill_sample_table(DrMrUi* ui, int samples, GtkWidget** gain_sliders,
     GtkWidget* pan_slider;
     GtkWidget* gain_label;
     GtkWidget* pan_label;
-    sprintf(buf,"<b>Sample %i</b>",(si+1));
+    sprintf(buf,"<b>%s</b>",names[si]);
 
     frame = gtk_frame_new(buf);
     gtk_label_set_use_markup(GTK_LABEL(gtk_frame_get_label_widget(GTK_FRAME(frame))),true);
@@ -200,7 +200,7 @@ static gboolean kit_callback(gpointer data) {
 
       gain_sliders = malloc(samples*sizeof(GtkWidget*));
       pan_sliders = malloc(samples*sizeof(GtkWidget*));
-      fill_sample_table(ui,samples,gain_sliders,pan_sliders);
+      fill_sample_table(ui,samples,ui->kits->kits[ui->kitReq].sample_names,gain_sliders,pan_sliders);
       gtk_box_pack_start(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),
 			 true,true,5);
       gtk_box_reorder_child(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),0);
