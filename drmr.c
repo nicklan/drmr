@@ -210,10 +210,11 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	  // changed after the check that the midi-note is valid
 	  pthread_mutex_lock(&drmr->load_mutex); 
 	  if (nn >= 0 && nn < drmr->num_samples) {
-	    if (drmr->samples[nn].layer_count > 0)
+	    if (drmr->samples[nn].layer_count > 0) {
 	      layer_to_sample(drmr->samples+nn,*(drmr->gains[nn]));
-	    if (drmr->samples[nn].limit == 0)
-	      fprintf(stderr,"Failed to find layer at: %i for %f\n",nn,*drmr->gains[nn]);
+	      if (drmr->samples[nn].limit == 0)
+		fprintf(stderr,"Failed to find layer at: %i for %f\n",nn,*drmr->gains[nn]);
+	    }
 	    drmr->samples[nn].active = 1;
 	    drmr->samples[nn].offset = 0;
 	  }

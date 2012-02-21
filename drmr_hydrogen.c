@@ -175,9 +175,7 @@ endElement(void *userData, const char *name)
   }
 
 
-  if (info->in_instrument &&
-      (info->cur_instrument && (info->cur_instrument->filename || info->cur_instrument->layers)) &&
-      !strcmp(name,"instrument")) {
+  if (info->in_instrument && info->cur_instrument && !strcmp(name,"instrument")) {
     struct instrument_info * cur_i = info->kit_info->instruments;
     if (cur_i) {
       while(cur_i->next) cur_i = cur_i->next;
@@ -530,7 +528,7 @@ drmr_sample* load_hydrogen_kit(char *path, double rate, int *num_samples) {
       samples[i].limit = layer->limit;
       samples[i].data = layer->data;
       free(layer);
-    } else {
+    } else if (cur_i->layers) {
       int layer_count = 0;
       int j;
       struct instrument_layer *cur_l = cur_i->layers;
@@ -556,6 +554,13 @@ drmr_sample* load_hydrogen_kit(char *path, double rate, int *num_samples) {
 	j++;
 	cur_l = cur_l->next;
       }
+    } else { // no layer or file, empty inst
+      samples[i].layer_count = 0;
+      samples[i].layers = NULL;
+      samples[i].offset = 0;
+      samples[i].info = NULL;
+      samples[i].limit = 0;
+      samples[i].data = NULL;
     }
     samples[i].active = 0;
     i_to_free = cur_i;
