@@ -55,6 +55,8 @@ static char* default_drumkit_locations[] = {
 
 #define MAX_CHAR_DATA 512
 
+char *unknownstr = "(Unknown)";
+
 struct instrument_layer {
   char* filename;
   float min;
@@ -76,7 +78,6 @@ struct instrument_info {
 struct kit_info {
   char* name;
   char* desc;
-  int inst_count;
   // linked list of intruments, null terminated
   struct instrument_info* instruments;
 };
@@ -112,10 +113,8 @@ startElement(void *userData, const char *name, const char **atts)
     if (info->in_instrument_list) {
       if (!strcmp(name,"instrument")) {
 	info->in_instrument = 1;
-	if (!info->scan_only) {
-	  info->cur_instrument = malloc(sizeof(struct instrument_info));
-	  memset(info->cur_instrument,0,sizeof(struct instrument_info));
-	}
+	info->cur_instrument = malloc(sizeof(struct instrument_info));
+	memset(info->cur_instrument,0,sizeof(struct instrument_info));
       }
     } else {
       if (!strcmp(name,"instrumentList"))
@@ -150,21 +149,13 @@ endElement(void *userData, const char *name)
       info->cur_layer->gain = atof(info->cur_buf);
   }
 
-  if (info->in_instrument) {
-    if (info->scan_only) {
-      if (!strcmp(name,"filename") && !info->counted_cur_inst) {
-	info->kit_info->inst_count++;
-	info->counted_cur_inst = 1;
-      }
-    }
-    else if (!info->in_layer) {
-      if (!strcmp(name,"id"))
-	info->cur_instrument->id = atoi(info->cur_buf);
-      if (!strcmp(name,"filename"))
-	info->cur_instrument->filename = strdup(info->cur_buf);
-      if (!strcmp(name,"name"))
-	info->cur_instrument->name = strdup(info->cur_buf);
-    }
+  if (info->in_instrument && !info->in_layer) {
+    if (!strcmp(name,"id"))
+      info->cur_instrument->id = atoi(info->cur_buf);
+    if (!strcmp(name,"filename"))
+      info->cur_instrument->filename = strdup(info->cur_buf);
+    if (!strcmp(name,"name"))
+      info->cur_instrument->name = strdup(info->cur_buf);
   }
 
   info->cur_off = 0;
@@ -183,12 +174,8 @@ endElement(void *userData, const char *name)
     info->in_layer = 0;
   }
 
-  if (info->scan_only && info->in_instrument && !strcmp(name,"instrument")) {
-    info->counted_cur_inst = 0;
-    info->in_instrument = 0;
-  }
 
-  if (!info->scan_only && info->in_instrument &&
+  if (info->in_instrument &&
       (info->cur_instrument && (info->cur_instrument->filename || info->cur_instrument->layers)) &&
       !strcmp(name,"instrument")) {
     struct instrument_info * cur_i = info->kit_info->instruments;
@@ -296,13 +283,31 @@ kits* scan_kits() {
 	} while (!done);
 	XML_ParserFree(parser);
 	if (info.kit_info->name) {
+	  int i = 0;
 	  scanned_kit* kit = malloc(sizeof(scanned_kit));
 	  struct kit_list* node = malloc(sizeof(struct kit_list));
 	  memset(kit,0,sizeof(scanned_kit));
 	  memset(node,0,sizeof(struct kit_list));
 	  kit->name = info.kit_info->name;
 	  kit->desc = info.kit_info->desc;
-	  kit->samples = info.kit_info->inst_count;
+	  
+	  struct instrument_info *cur_i = info.kit_info->instruments;
+	  while (cur_i) {
+	    kit->samples++;
+	    cur_i = cur_i->next;
+	  }
+	  kit->sample_names = malloc(kit->samples*sizeof(char*));
+	  cur_i = info.kit_info->instruments;
+	  while (cur_i) {
+	    struct instrument_info *to_free = cur_i;
+	    if (cur_i->name)
+	      kit->sample_names[i++] = cur_i->name;
+	    else
+	      kit->sample_names[i++] = unknownstr;
+	    cur_i = cur_i->next;
+	    free(to_free);
+	  }
+
 	  snprintf(buf,BUFSIZ,"%s/%s/",cur_path,ep->d_name);
 	  kit->path = strdup(buf);
 	  node->skit = kit;
@@ -341,6 +346,7 @@ kits* scan_kits() {
     ret->kits[cp].desc = cur_k->skit->desc;
     ret->kits[cp].path = cur_k->skit->path;
     ret->kits[cp].samples = cur_k->skit->samples;
+    ret->kits[cp].sample_names = cur_k->skit->sample_names;
     cp++;
     free(cur_k->skit);
     cur_k = cur_k->next;
@@ -576,10 +582,16 @@ drmr_sample* load_hydrogen_kit(char *path, double rate, int *num_samples) {
 
 int main(int argc, char* argv[]) {
   kits *kits;
-  int i;
+  int i,j;
   kits = scan_kits();
-  for (i=0;i<kits->num_kits;i++)
+  for (i=0;i<kits->num_kits;i++) {
     printf("\t%s:\n\t\tpath: %s\n\t\tsamples: %i\n",kits->kits[i].name,kits->kits[i].path,kits->kits[i].samples);
+    printf("\t\t");
+    for (j=0;j<kits->kits[i].samples;j++) {
+      printf("%s, ",kits->kits[i].sample_names[j]);
+    }
+    printf("\n\n");
+  }
 
   return 0;
 }

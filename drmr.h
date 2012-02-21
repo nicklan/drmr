@@ -30,6 +30,7 @@ typedef struct {
   char* name;
   char* desc;
   char* path;
+  char** sample_names;
   int samples;
 } scanned_kit;
 
