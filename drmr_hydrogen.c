@@ -152,7 +152,7 @@ endElement(void *userData, const char *name)
   if (info->in_instrument && !info->in_layer) {
     if (!strcmp(name,"id"))
       info->cur_instrument->id = atoi(info->cur_buf);
-    if (!strcmp(name,"filename"))
+    if (!info->scan_only && !strcmp(name,"filename"))
       info->cur_instrument->filename = strdup(info->cur_buf);
     if (!strcmp(name,"name"))
       info->cur_instrument->name = strdup(info->cur_buf);
