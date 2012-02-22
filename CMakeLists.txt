@@ -43,6 +43,7 @@ set_target_properties(drmr_ui PROPERTIES PREFIX "")
 target_link_libraries(drmr ${LV2_LIBRARIES} ${SNDFILE_LIBRARIES} ${SAMPLERATE_LIBRARIES} ${EXPAT_LIBRARIES} m)
 target_link_libraries(drmr_ui ${LV2_LIBRARIES} ${GTK2_LIBRARIES} ${SNDFILE_LIBRARIES} ${SAMPLERATE_LIBRARIES} ${EXPAT_LIBRARIES} m)
 
+
 add_definitions ( -DPIC )
 
 set_target_properties (drmr_ui 
@@ -56,6 +57,29 @@ if (NOT USE_NKNOB)
     COMPILE_FLAGS "-DNO_NKNOB"
   )
 endif (NOT USE_NKNOB)
+
+# Custom test commands
+add_executable ( htest
+  EXCLUDE_FROM_ALL
+  drmr_hydrogen.c
+)
+
+add_executable ( knobt
+  EXCLUDE_FROM_ALL
+  nknob.c
+)
+
+# config test executables
+target_link_libraries(htest ${LV2_LIBRARIES} ${GTK2_LIBRARIES} ${SNDFILE_LIBRARIES} ${SAMPLERATE_LIBRARIES} ${EXPAT_LIBRARIES} m)
+set_target_properties ( htest
+  PROPERTIES
+  COMPILE_FLAGS "-D_TEST_HYDROGEN_PARSER"
+)
+target_link_libraries(knobt ${LV2_LIBRARIES} ${GTK2_LIBRARIES} ${SNDFILE_LIBRARIES} ${SAMPLERATE_LIBRARIES} ${EXPAT_LIBRARIES} m)
+set_target_properties ( knobt
+  PROPERTIES
+  COMPILE_FLAGS "-D_TEST_N_KNOB -DINSTALL_DIR=\\\"${CMAKE_INSTALL_PREFIX}/${LV2_INSTALL_DIR}\\\""
+)
 
 # config install
 install(TARGETS drmr drmr_ui
