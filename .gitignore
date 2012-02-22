@@ -2,6 +2,7 @@ drmr.so
 drmr_ui.xml
 drmr_ui.so
 drmr.lv2
+build
 /logo.xcf
 /htest
 /knobt
