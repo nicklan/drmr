@@ -113,11 +113,27 @@ static void n_knob_class_init (NKnobClass *klass) {
   widget_class->scroll_event =   n_knob_scroll;
 }
 
+static gboolean tooltip_callback(GtkWidget  *widget,
+				 gint        x,
+				 gint        y,
+				 gboolean    keyboard_mode,
+				 GtkTooltip *tooltip,
+				 gpointer    user_data) {
+  if (gtk_widget_get_has_tooltip(widget)) {
+    gchar buf[16];
+    snprintf(buf,16,"%.2f",gtk_range_get_value(GTK_RANGE(widget)));
+    gtk_tooltip_set_text(tooltip,buf);
+    return TRUE;
+  }
+  return FALSE;
+}
+
 static void n_knob_init (NKnob *knob) {
   knob->state = STATE_IDLE;
   knob->saved_x = knob->saved_y = 0;
   knob->size = KNOB_SIZE;
   knob->pixbuf = NULL;
+  g_signal_connect(G_OBJECT(knob),"query-tooltip",G_CALLBACK(tooltip_callback),NULL);
 }
 
 
@@ -202,12 +218,6 @@ static void n_knob_realize(GtkWidget *widget) {
     (*GTK_WIDGET_CLASS(n_knob_parent_class)->realize)(widget);
 
   knob = N_KNOB(widget);
-
-  /* FIXME keeps khagan from drawing knob */
-  if(widget->allocation.height > 1)
-    {
-      knob->size = widget->allocation.height;
-    }
     
   /* init first pixbuf */
   if(pixbuf == NULL){
@@ -253,7 +263,7 @@ static inline gdouble get_adj_value(NKnob *knob, gdouble val) {
 static gint n_knob_expose(GtkWidget *widget, GdkEventExpose *event)
 {
   NKnob *knob;
-  int dx;
+  gint dx;
 
   g_return_val_if_fail(widget != NULL, FALSE);
   g_return_val_if_fail(N_IS_KNOB(widget), FALSE);
@@ -264,48 +274,45 @@ static gint n_knob_expose(GtkWidget *widget, GdkEventExpose *event)
 
   knob = N_KNOB(widget);
 
-  dx = (int)(51 * get_zero_one_value(knob)) * knob->size;
+  //xoff = widget->allocation.width/2 - knob->size/2;
+  dx = (gint)(51 * get_zero_one_value(knob)) * knob->size;
   
   gdk_pixbuf_render_to_drawable_alpha( knob->pixbuf, widget->window,
 				       dx, 0, widget->allocation.x, widget->allocation.y,
 				       knob->size, knob->size, GDK_PIXBUF_ALPHA_FULL, 0, 0,0,0 );
 
-//    gdk_draw_pixbuf(widget->window, knob->mask_gc, knob->pixbuf,
-//                    dx, 0, 0, 0, knob->size, knob->size,GDK_RGB_DITHER_NONE,0,0);
-
-    return FALSE;
+  return FALSE;
 }
 
 static gint n_knob_button_press(GtkWidget *widget, GdkEventButton *event) {
-    NKnob *knob;
+  NKnob *knob;
 
-    g_return_val_if_fail(widget != NULL, FALSE);
-    g_return_val_if_fail(N_IS_KNOB(widget), FALSE);
-    g_return_val_if_fail(event != NULL, FALSE);
+  g_return_val_if_fail(widget != NULL, FALSE);
+  g_return_val_if_fail(N_IS_KNOB(widget), FALSE);
+  g_return_val_if_fail(event != NULL, FALSE);
 
-    knob = N_KNOB(widget);
+  knob = N_KNOB(widget);
 
-    switch (knob->state) {
-    case STATE_IDLE:
-      switch (event->button) {
-      case 1:
-      case 2:
-	gtk_grab_add(widget);
-	knob->state = STATE_PRESSED;
-	knob->saved_x = event->x;
-	knob->saved_y = event->y;
-	break;
-	
-      default:
-	break;
-      }
+  switch (knob->state) {
+  case STATE_IDLE:
+    switch (event->button) {
+    case 1:
+    case 2:
+      gtk_grab_add(widget);
+      knob->state = STATE_PRESSED;
+      knob->saved_x = event->x;
+      knob->saved_y = event->y;
       break;
       
     default:
       break;
     }
+    break;
+  default:
+    break;
+  }
 
-    return FALSE;
+  return FALSE;
 }
 
 static gint n_knob_button_release(GtkWidget *widget, GdkEventButton *event) {
