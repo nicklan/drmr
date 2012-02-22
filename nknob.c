@@ -263,7 +263,7 @@ static inline gdouble get_adj_value(NKnob *knob, gdouble val) {
 static gint n_knob_expose(GtkWidget *widget, GdkEventExpose *event)
 {
   NKnob *knob;
-  gint dx;
+  gint dx,xoff;
 
   g_return_val_if_fail(widget != NULL, FALSE);
   g_return_val_if_fail(N_IS_KNOB(widget), FALSE);
@@ -274,11 +274,11 @@ static gint n_knob_expose(GtkWidget *widget, GdkEventExpose *event)
 
   knob = N_KNOB(widget);
 
-  //xoff = widget->allocation.width/2 - knob->size/2;
+  xoff = widget->allocation.width/2 - knob->size/2;
   dx = (gint)(51 * get_zero_one_value(knob)) * knob->size;
   
   gdk_pixbuf_render_to_drawable_alpha( knob->pixbuf, widget->window,
-				       dx, 0, widget->allocation.x, widget->allocation.y,
+				       dx, 0, widget->allocation.x+xoff, widget->allocation.y,
 				       knob->size, knob->size, GDK_PIXBUF_ALPHA_FULL, 0, 0,0,0 );
 
   return FALSE;
@@ -368,7 +368,7 @@ static gint n_knob_button_release(GtkWidget *widget, GdkEventButton *event) {
 static gint n_knob_motion_notify(GtkWidget *widget, GdkEventMotion *event) {
   NKnob *knob;
   GdkModifierType mods;
-  gint x, y;
+  gint x, y, xoff;
 
   g_return_val_if_fail(widget != NULL, FALSE);
   g_return_val_if_fail(N_IS_KNOB(widget), FALSE);
@@ -383,11 +383,13 @@ static gint n_knob_motion_notify(GtkWidget *widget, GdkEventMotion *event) {
   if (event->is_hint || (event->window != widget->window))
     gdk_window_get_pointer(widget->window, &x, &y, &mods);
   
+  xoff = widget->allocation.width/2 - knob->size/2;
+  x-=xoff;
+
   switch (knob->state) {
   case STATE_PRESSED:
     knob->state = STATE_DRAGGING;
     /* fall through */
-
   case STATE_DRAGGING:
     if (mods & GDK_BUTTON1_MASK) {
       n_knob_update_mouse(knob, x-widget->allocation.x, y-widget->allocation.y , TRUE);
