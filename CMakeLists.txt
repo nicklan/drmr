@@ -6,6 +6,9 @@ project (DrMr)
 set(LV2_INSTALL_DIR lib/lv2 CACHE PATH "Specifies where the LV2 libraries should be installed")
 set(CMAKE_C_FLAGS "-Wall")
 
+# Availble options
+option(USE_NKNOB  "Use custom NKnob widgets for gain/pan instead of Gtk sliders" ON)
+
 # check for our various libraries
 find_package(PkgConfig)
 pkg_check_modules(LV2 REQUIRED lv2-plugin>=1.0.4)
@@ -33,6 +36,7 @@ add_library(drmr_ui SHARED
   drmr_hydrogen.h
   nknob.h
 )
+
 set_target_properties(drmr PROPERTIES PREFIX "")
 set_target_properties(drmr_ui PROPERTIES PREFIX "")
 
@@ -46,6 +50,12 @@ set_target_properties (drmr_ui
   DEFINE_SYMBOL "INSTALL_DIR=\"${CMAKE_INSTALL_PREFIX}/${LV2_INSTALL_DIR}\""
 )
 
+if (NOT USE_NKNOB)
+  set_target_properties (drmr_ui
+    PROPERTIES
+    COMPILE_FLAGS "-DNO_NKNOB"
+  )
+endif (NOT USE_NKNOB)
 
 # config install
 install(TARGETS drmr drmr_ui

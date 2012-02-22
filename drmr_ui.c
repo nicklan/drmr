@@ -82,53 +82,59 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names,GtkWidget** 
     GtkWidget* pan_slider;
     GtkWidget* gain_label;
     GtkWidget* pan_label;
+    gboolean slide_expand;
     sprintf(buf,"<b>%s</b>",names[si]);
 
     frame = gtk_frame_new(buf);
     gtk_label_set_use_markup(GTK_LABEL(gtk_frame_get_label_widget(GTK_FRAME(frame))),true);
     gtk_frame_set_shadow_type(GTK_FRAME(frame),GTK_SHADOW_OUT);
     hbox = gtk_hbox_new(false,0);
- 
-    //gain_slider = gtk_vscale_new_with_range(GAIN_MIN,6.0,1.0);
+
+#ifdef NO_NKNOB
+    gain_slider = gtk_vscale_new_with_range(GAIN_MIN,6.0,1.0);
+    gtk_scale_set_value_pos(GTK_SCALE(gain_slider),GTK_POS_BOTTOM);
+    gtk_scale_set_digits(GTK_SCALE(gain_slider),1);
+    gtk_scale_add_mark(GTK_SCALE(gain_slider),0.0,GTK_POS_RIGHT,"0 dB");
+    // Hrmm, -inf label is at top in ardour for some reason
+    //gtk_scale_add_mark(GTK_SCALE(gain_slider),GAIN_MIN,GTK_POS_RIGHT,"-inf");
+    gtk_range_set_inverted(GTK_RANGE(gain_slider),true);
+    slide_expand = true;
+#else
     gain_slider = n_knob_new_with_range(0.0,GAIN_MIN,6.0,1.0);
     gtk_widget_set_has_tooltip(gain_slider,TRUE);
-    gtk_widget_set_size_request(gain_slider,-1,50);
+    slide_expand = false;
+#endif
     g_object_set_qdata (G_OBJECT(gain_slider),ui->gain_quark,GINT_TO_POINTER(si));
     if (gain_sliders) gain_sliders[si] = gain_slider;
-    gtk_range_set_inverted(GTK_RANGE(gain_slider),true);
-    //gtk_scale_set_value_pos(GTK_SCALE(gain_slider),GTK_POS_BOTTOM);
-
     if (si < 32)
       gtk_range_set_value(GTK_RANGE(gain_slider),ui->gain_vals[si]);
     else // things are gross if we have > 32 samples, what to do?
       gtk_range_set_value(GTK_RANGE(gain_slider),0.0);
     g_signal_connect(G_OBJECT(gain_slider),"change-value",G_CALLBACK(gain_callback),ui);
-    //gtk_scale_set_digits(GTK_SCALE(gain_slider),1);
-    //gtk_scale_add_mark(GTK_SCALE(gain_slider),0.0,GTK_POS_RIGHT,"0 dB");
-    // Hrmm, -inf label is at top in ardour for some reason
-    //gtk_scale_add_mark(GTK_SCALE(gain_slider),GAIN_MIN,GTK_POS_RIGHT,"-inf");
     gain_label = gtk_label_new("Gain");
     gain_vbox = gtk_vbox_new(false,0);
 
-    //pan_slider = gtk_hscale_new_with_range(-1.0,1.0,0.1);
+#ifdef NO_NKNOB
+    pan_slider = gtk_hscale_new_with_range(-1.0,1.0,0.1);
+    gtk_scale_add_mark(GTK_SCALE(pan_slider),0.0,GTK_POS_TOP,NULL);
+#else
     pan_slider = n_knob_new_with_range(0.0,-1.0,1.0,0.1);
     gtk_widget_set_has_tooltip(pan_slider,TRUE);
-    gtk_widget_set_size_request(pan_slider,50,-1);
+#endif
     if (pan_sliders) pan_sliders[si] = pan_slider;
     if (si < 32)
       gtk_range_set_value(GTK_RANGE(pan_slider),ui->pan_vals[si]);
     else
       gtk_range_set_value(GTK_RANGE(pan_slider),0);
     g_object_set_qdata (G_OBJECT(pan_slider),ui->pan_quark,GINT_TO_POINTER(si));
-    //gtk_scale_add_mark(GTK_SCALE(pan_slider),0.0,GTK_POS_TOP,NULL);
     g_signal_connect(G_OBJECT(pan_slider),"change-value",G_CALLBACK(pan_callback),ui);
     pan_label = gtk_label_new("Pan");
     pan_vbox = gtk_vbox_new(false,0);
     
-    gtk_box_pack_start(GTK_BOX(gain_vbox),gain_slider,false,false,0);
+    gtk_box_pack_start(GTK_BOX(gain_vbox),gain_slider,slide_expand,slide_expand,0);
     gtk_box_pack_start(GTK_BOX(gain_vbox),gain_label,false,false,0);
 
-    gtk_box_pack_start(GTK_BOX(pan_vbox),pan_slider,false,false,0);
+    gtk_box_pack_start(GTK_BOX(pan_vbox),pan_slider,slide_expand,slide_expand,0);
     gtk_box_pack_start(GTK_BOX(pan_vbox),pan_label,false,false,0);
 
     gtk_box_pack_start(GTK_BOX(hbox),gain_vbox,true,true,0);
