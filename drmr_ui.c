@@ -125,10 +125,10 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names,GtkWidget** 
     pan_label = gtk_label_new("Pan");
     pan_vbox = gtk_vbox_new(false,0);
     
-    gtk_box_pack_start(GTK_BOX(gain_vbox),gain_slider,true,true,0);
+    gtk_box_pack_start(GTK_BOX(gain_vbox),gain_slider,false,false,0);
     gtk_box_pack_start(GTK_BOX(gain_vbox),gain_label,false,false,0);
 
-    gtk_box_pack_start(GTK_BOX(pan_vbox),pan_slider,true,true,0);
+    gtk_box_pack_start(GTK_BOX(pan_vbox),pan_slider,false,false,0);
     gtk_box_pack_start(GTK_BOX(pan_vbox),pan_label,false,false,0);
 
     gtk_box_pack_start(GTK_BOX(hbox),gain_vbox,true,true,0);
