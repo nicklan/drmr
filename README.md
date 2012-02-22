@@ -25,14 +25,34 @@ Only via git for now, just check out this repo
 
 Compilation and Install
 -----------------------
+DrMr is built with [CMake](http://www.cmake.org).
+
+To build it simply do (from this dir):
+    mkdir build
+    cd build
+    cmake ..
+
+Then do:
+    make
+    make install
+
+to install.  There are some customizable variables for cmake.  To see them do "cmake -L".  The important ones are:
+
+LV2_INSTALL_DIR - The directory to install the DrMr plugin to. To install to your home directory, use "~/.lv2" and clear the CMAKE_INSTALL_PREFIX. This defaults to "lib/lv2" (this is relative to CMAKE_INSTALL_PREFIX, which is usually /usr/local)
+
+You can also use "ccmake .." or "cmake-gui .." for a more interactive configuration process.
+
+A legacy Makefile is included, that will possibly work for you if you don't want to use cmake.  To use it just do (from this dir):
+    make -f Makefile.legacy
+    make -f Makefile.legacy install
+
 You'll need the following libraries to build and install DrMr:
 
 - [libsndfile](http://www.mega-nerd.com/libsndfile/)
 - [libsamplerate](http://www.mega-nerd.com/SRC/index.html)
 - [lv2](http://lv2plug.in/)
 - [libexpat](http://expat.sourceforge.net)
-
-The Makefile has the INSTALL_DIR and CC flags hard coded to /usr/local/lib/lv2 and gcc at the moment.  Edit those if you want to change that.
+- [gtk+](http://www.gtk.org)
 
 DrMr scans the following directories for hydrogen drum kits:
 
@@ -45,7 +65,7 @@ DrMr scans the following directories for hydrogen drum kits:
 If you want to add others, add them to the default_drumkit_locations array at the top of drmr_hydrogen.c
 
 ### Note 1
-As stated above, a goal of DrMr is to have the host save all the state for you.  As such, the current kit needs to be a control.  Unfortunately, string controls in LV2 are experimental at the moment, and not supported by many hosts (in particular ardour doesn't support them).  This means the kit needs to be set via a numeric control.  DrMr specifies an integer index as a control to select which kit to load.  A kits index is the order in which is was found.  This means changing, adding, or removing hydrogen kits could mess up your saved index.  Sorry.
+As stated above, a goal of DrMr is to have the host save all the state for you.  As such, the current kit needs to be a control.  Unfortunately, string controls in LV2 are experimental at the moment, and not supported by many hosts (in particular Ardour doesn't support them).  This means the kit needs to be set via a numeric control.  DrMr specifies an integer index as a control to select which kit to load.  A kits index is the order in which is was found.  This means changing, adding, or removing hydrogen kits could mess up your saved index.  Sorry.
 
 You can figure out which kit is loaded by looking in the GtkUI at the bottom, or look at the print output from your host, as drmr will print the names of kits as it loads them.
 
