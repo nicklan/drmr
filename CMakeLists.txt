@@ -39,6 +39,10 @@ add_library(drmr_ui SHARED
 
 set_target_properties(drmr PROPERTIES PREFIX "")
 set_target_properties(drmr_ui PROPERTIES PREFIX "")
+set_target_properties(drmr_ui 
+  PROPERTIES
+  LINK_FLAGS "-Wl,-znodelete"
+)
 
 target_link_libraries(drmr ${LV2_LIBRARIES} ${SNDFILE_LIBRARIES} ${SAMPLERATE_LIBRARIES} ${EXPAT_LIBRARIES} m)
 target_link_libraries(drmr_ui ${LV2_LIBRARIES} ${GTK2_LIBRARIES} ${SNDFILE_LIBRARIES} ${SAMPLERATE_LIBRARIES} ${EXPAT_LIBRARIES} m)

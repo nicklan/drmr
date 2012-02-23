@@ -96,14 +96,6 @@ GType
 n_knob_get_type (void) {
   static GType nknob_type;
   if (!nknob_type) {
-    // We need to make ourselves memory resident so our type won't get unloaded
-    // when the window is shown/hiddent
-    GModule *module_self = g_module_open (INSTALL_DIR"/drmr.lv2/drmr_ui.so", 0);
-    if (!module_self)
-      g_print ("error (segfault eminent): %s\n", g_module_error ());
-    else 
-      g_module_make_resident(module_self);
-
     static const GTypeInfo object_info = {
       sizeof (NKnobClass),
       (GBaseInitFunc) NULL,
