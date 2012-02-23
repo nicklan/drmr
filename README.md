@@ -29,11 +29,13 @@ Compilation and Install
 DrMr is built with [CMake](http://www.cmake.org).
 
 To build it simply do (from this dir):
+
     mkdir build
     cd build
     cmake ..    (or "cmake -DUSE_NKNOB=OFF .." if you want old style sliders)
 
 Then do:
+
     make
     make install
 
@@ -46,6 +48,7 @@ LV2_INSTALL_DIR - The directory to install the DrMr plugin to. To install to you
 You can also use "ccmake .." or "cmake-gui .." for a more interactive configuration process.
 
 A legacy Makefile is included, that will possibly work for you if you don't want to use cmake.  To use it just do (from this dir):
+
     make -f Makefile.legacy
     make -f Makefile.legacy install
 
