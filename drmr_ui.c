@@ -391,34 +391,28 @@ port_event(LV2UI_Handle handle,
   }
   else if (index >= DRMR_GAIN_ONE &&
 	   index <= DRMR_GAIN_THIRTYTWO) {
-    if (ui->gain_sliders) {
-      float gain = *(float*)buffer;
-      int idx = index-DRMR_GAIN_ONE;
-      ui->gain_vals[idx] = gain;
-      if (idx < ui->samples) {
-	struct slider_callback_data* data = malloc(sizeof(struct slider_callback_data));
-	data->range = GTK_RANGE(ui->gain_sliders[idx]);
-	data->val = gain;
-	g_idle_add(slider_callback,data);
-	//GtkRange* range = GTK_RANGE(ui->gain_sliders[idx]);
-	//gtk_range_set_value(range,gain);
-      }
+    float gain = *(float*)buffer;
+    int idx = index-DRMR_GAIN_ONE;
+    ui->gain_vals[idx] = gain;
+    if (idx < ui->samples && ui->gain_sliders) {
+      struct slider_callback_data* data = malloc(sizeof(struct slider_callback_data));
+      data->range = GTK_RANGE(ui->gain_sliders[idx]);
+      data->val = gain;
+      g_idle_add(slider_callback,data);
+      //GtkRange* range = GTK_RANGE(ui->gain_sliders[idx]);
+      //gtk_range_set_value(range,gain);
     }
   }
   else if (index >= DRMR_PAN_ONE &&
 	   index <= DRMR_PAN_THIRTYTWO) {
-    if (ui->pan_sliders) {
-      float pan = *(float*)buffer;
-      int idx = index-DRMR_PAN_ONE;
-      ui->pan_vals[idx] = pan;
-      if (idx < ui->samples) {
-	struct slider_callback_data* data = malloc(sizeof(struct slider_callback_data));
-	data->range = GTK_RANGE(ui->pan_sliders[idx]);
-	data->val = pan;
-	g_idle_add(slider_callback,data);
-	//GtkRange* range = GTK_RANGE(ui->pan_sliders[idx]);
-	//gtk_range_set_value(range,pan);
-      }
+    float pan = *(float*)buffer;
+    int idx = index-DRMR_PAN_ONE;
+    ui->pan_vals[idx] = pan;
+    if (idx < ui->samples && ui->pan_sliders) {
+      struct slider_callback_data* data = malloc(sizeof(struct slider_callback_data));
+      data->range = GTK_RANGE(ui->pan_sliders[idx]);
+      data->val = pan;
+      g_idle_add(slider_callback,data);
     }
   }
 }
