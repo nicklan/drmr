@@ -6,6 +6,10 @@
  *         over a GtkRange (i.e. it can be used exactly like a
  *         GtkRange from the outside)
  *
+ * In addition, this knob makes the drmr_ui.so module memory resident
+ * so it can avoid attempting to re-load itself when shown/hidden in
+ * a ui.
+ *
  * From PhatKnob code:
  *    Most of this code comes from gAlan 0.2.0, copyright (C) 1999
  *    Tony Garnock-Jones, with modifications by Sean Bolton,
@@ -84,11 +88,38 @@ static void n_knob_get_property      (GObject *object,
 GError *gerror;
 
 /* global pixbufs for less mem usage */
-GdkPixbuf **pixbuf = NULL;
+static GdkPixbuf **pixbuf = NULL;
 
-/* Local data */
+// Can't use G_DEFINE_TYPE because ardour is at gtk 2.22
+static NKnobClass *parent_class;
+GType
+n_knob_get_type (void) {
+  static GType nknob_type;
+  if (!nknob_type) {
+    // We need to make ourselves memory resident so our type won't get unloaded
+    // when the window is shown/hiddent
+    GModule *module_self = g_module_open (INSTALL_DIR"/drmr.lv2/drmr_ui.so", 0);
+    if (!module_self)
+      g_print ("error (segfault eminent): %s\n", g_module_error ());
+    else 
+      g_module_make_resident(module_self);
 
-G_DEFINE_TYPE (NKnob, n_knob, GTK_TYPE_RANGE);
+    static const GTypeInfo object_info = {
+      sizeof (NKnobClass),
+      (GBaseInitFunc) NULL,
+      (GBaseFinalizeFunc) NULL,
+      (GClassInitFunc) n_knob_class_init,
+      (GClassFinalizeFunc) NULL,
+      NULL, // class data
+      sizeof (NKnob),
+      0, // preallocs
+      (GInstanceInitFunc) n_knob_init,
+      NULL  // value table
+    };
+    nknob_type = g_type_register_static(GTK_TYPE_RANGE,"NKnob",&object_info,0);
+  }
+  return nknob_type;
+}
 
 static void n_knob_class_init (NKnobClass *klass) {
   GtkObjectClass   *object_class;
@@ -98,6 +129,8 @@ static void n_knob_class_init (NKnobClass *klass) {
   object_class =   GTK_OBJECT_CLASS(klass);
   widget_class =   GTK_WIDGET_CLASS(klass);
   g_object_class = G_OBJECT_CLASS(klass);
+
+  parent_class = g_type_class_peek_parent (klass);
   
   g_object_class->set_property = n_knob_set_property;
   g_object_class->get_property = n_knob_get_property;
@@ -172,8 +205,8 @@ GtkWidget *n_knob_new(GtkAdjustment *adjustment) {
  * Returns: a newly created #NKnob
  * 
  */
-GtkWidget* n_knob_new_with_range (double value, double lower,
-				  double upper, double step) {
+GtkWidget* n_knob_new_with_range (gdouble value, gdouble lower,
+				  gdouble upper, gdouble step) {
   GtkAdjustment* adj;
   adj = (GtkAdjustment*) gtk_adjustment_new (value, lower, upper, step, step, 0);
   return n_knob_new (adj);
@@ -181,28 +214,15 @@ GtkWidget* n_knob_new_with_range (double value, double lower,
 
 static void n_knob_destroy(GtkObject *object) {
   NKnob *knob;
-
+  
   g_return_if_fail(object != NULL);
   g_return_if_fail(N_IS_KNOB(object));
 
   knob = N_KNOB(object);
+  knob->pixbuf = NULL;
 
-  if (knob->mask) {
-    gdk_bitmap_unref(knob->mask);
-    knob->mask = NULL;
-  }
-
-  if (knob->mask_gc) {
-    gdk_gc_unref(knob->mask_gc);
-    knob->mask_gc = NULL;
-  }
-  if (knob->red_gc) {
-    gdk_gc_unref(knob->red_gc);
-    knob->red_gc = NULL;
-  }
-
-  if (GTK_OBJECT_CLASS(n_knob_parent_class)->destroy)
-    (*GTK_OBJECT_CLASS(n_knob_parent_class)->destroy)(object);
+  if (GTK_OBJECT_CLASS(parent_class)->destroy)
+    (*GTK_OBJECT_CLASS(parent_class)->destroy)(object);
 }
 
 
@@ -214,8 +234,8 @@ static void n_knob_realize(GtkWidget *widget) {
   g_return_if_fail(widget != NULL);
   g_return_if_fail(N_IS_KNOB(widget));
   
-  if (GTK_WIDGET_CLASS(n_knob_parent_class)->realize)
-    (*GTK_WIDGET_CLASS(n_knob_parent_class)->realize)(widget);
+  if (GTK_WIDGET_CLASS(parent_class)->realize)
+    (*GTK_WIDGET_CLASS(parent_class)->realize)(widget);
 
   knob = N_KNOB(widget);
     
@@ -297,7 +317,7 @@ static gint n_knob_button_press(GtkWidget *widget, GdkEventButton *event) {
   case STATE_IDLE:
     switch (event->button) {
     case 1:
-    case 2:
+    case 3:
       gtk_grab_add(widget);
       knob->state = STATE_PRESSED;
       knob->saved_x = event->x;
@@ -317,49 +337,32 @@ static gint n_knob_button_press(GtkWidget *widget, GdkEventButton *event) {
 
 static gint n_knob_button_release(GtkWidget *widget, GdkEventButton *event) {
   NKnob *knob;
-  GtkRange *range;
-  GtkAdjustment *adj;
 
   g_return_val_if_fail(widget != NULL, FALSE);
   g_return_val_if_fail(N_IS_KNOB(widget), FALSE);
   g_return_val_if_fail(event != NULL, FALSE);
   
   knob = N_KNOB(widget);
-  range = GTK_RANGE(knob);
-  adj = gtk_range_get_adjustment(range);
 
-
-  switch (knob->state) {
-  case STATE_PRESSED:
-    gtk_grab_remove(widget);
-    knob->state = STATE_IDLE;
-    
-    switch (event->button) {
-    case 1:
-      gtk_range_set_value(range,
-			  gtk_range_get_value(range)+
-			  gtk_adjustment_get_page_increment(adj));
-      break;
+  switch (event->button) {
+  case 1:
+  case 3:
+    switch (knob->state) {
+    case STATE_PRESSED:
+      gtk_grab_remove(widget);
+      knob->state = STATE_IDLE;
+    case STATE_DRAGGING:
+      gtk_grab_remove(widget);
+      knob->state = STATE_IDLE;
       
-    case 3:
-      gtk_range_set_value(range,
-			  gtk_range_get_value(range)-
-			  gtk_adjustment_get_page_increment(adj));
       break;
-      
     default:
       break;
     }
     break;
-    
-  case STATE_DRAGGING:
-    gtk_grab_remove(widget);
-    knob->state = STATE_IDLE;
-    
-    break;
-    
-  default:
-    break;
+  case 2: {
+    gtk_range_set_value(GTK_RANGE(knob),0.0);
+  }
   }
   
   return FALSE;

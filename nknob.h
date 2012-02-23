@@ -27,18 +27,23 @@
  */
 
 
+#if defined(GTK_DISABLE_SINGLE_INCLUDES) && !defined (__GTK_H_INSIDE__) && !defined (GTK_COMPILATION)
+#error "Only <gtk/gtk.h> can be included directly."
+#endif
+
 #ifndef __NKNOB_H__
 #define __NKNOB_H__
 
-#include <gdk/gdk.h>
 #include <gtk/gtkrange.h>
 
 G_BEGIN_DECLS
 
+#define N_TYPE_KNOB          (n_knob_get_type ( ))
 #define N_KNOB(obj)          GTK_CHECK_CAST(obj, n_knob_get_type(), NKnob)
 #define N_KNOB_CLASS(klass)  GTK_CHECK_CLASS_CAST(klass, n_knob_get_type(), NKnobClass)
 #define N_IS_KNOB(obj)       GTK_CHECK_TYPE(obj, n_knob_get_type())
-#define N_TYPE_KNOB          (n_knob_get_type ( ))
+#define N_IS_KNOB_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), N_TYPE_KNOB))
+#define N_KNOB_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), N_TYPE_KNOB, NKnobClass))
 
 
 typedef struct _NKnob        NKnob;
@@ -56,16 +61,13 @@ struct _NKnob {
   
   /* Pixmap for knob */
   GdkPixbuf *pixbuf;
-  GdkBitmap *mask;
-  GdkGC *mask_gc;
-  GdkGC *red_gc;
 };
 
 struct _NKnobClass {
   GtkRangeClass parent_class;
 };
 
-GType n_knob_get_type ( );
+GType n_knob_get_type ( ) G_GNUC_CONST;
 
 GtkWidget* n_knob_new (GtkAdjustment* adjustment);
 
