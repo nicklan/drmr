@@ -40,6 +40,8 @@ typedef struct {
   GtkWidget** pan_sliders;
   float *gain_vals,*pan_vals;
 
+  gchar *bundle_path;
+
   int cols;
 
   int samples;
@@ -101,6 +103,7 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names,GtkWidget** 
     slide_expand = true;
 #else
     gain_slider = n_knob_new_with_range(0.0,GAIN_MIN,6.0,1.0);
+    n_knob_set_load_prefix(N_KNOB(gain_slider),ui->bundle_path);
     gtk_widget_set_has_tooltip(gain_slider,TRUE);
     slide_expand = false;
 #endif
@@ -119,6 +122,7 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names,GtkWidget** 
     gtk_scale_add_mark(GTK_SCALE(pan_slider),0.0,GTK_POS_TOP,NULL);
 #else
     pan_slider = n_knob_new_with_range(0.0,-1.0,1.0,0.1);
+    n_knob_set_load_prefix(N_KNOB(pan_slider),ui->bundle_path);
     gtk_widget_set_has_tooltip(pan_slider,TRUE);
 #endif
     if (pan_sliders) pan_sliders[si] = pan_slider;
@@ -326,6 +330,7 @@ instantiate(const LV2UI_Descriptor*   descriptor,
   ui->drmr_widget = NULL;
   ui->curKit = -1;
   ui->samples = 0;
+  ui->bundle_path = g_strdup(bundle_path);
   *widget = NULL;
 
   build_drmr_ui(ui);
@@ -359,6 +364,7 @@ static void cleanup(LV2UI_Handle handle) {
     gtk_widget_destroy(ui->drmr_widget);
   if (ui->gain_sliders) free(ui->gain_sliders);
   if (ui->pan_sliders) free(ui->pan_sliders);
+  g_free(ui->bundle_path);
   free_kits(ui->kits);
   free(ui);
 }

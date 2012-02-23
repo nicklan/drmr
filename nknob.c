@@ -158,6 +158,7 @@ static void n_knob_init (NKnob *knob) {
   knob->saved_x = knob->saved_y = 0;
   knob->size = KNOB_SIZE;
   knob->pixbuf = NULL;
+  knob->load_prefix = NULL;
   g_signal_connect(G_OBJECT(knob),"query-tooltip",G_CALLBACK(tooltip_callback),NULL);
 }
 
@@ -204,6 +205,14 @@ GtkWidget* n_knob_new_with_range (gdouble value, gdouble lower,
   return n_knob_new (adj);
 }
 
+void   n_knob_set_load_prefix(NKnob* knob, gchar* prefix) {
+  knob->load_prefix = g_strdup(prefix);
+}
+gchar* n_knob_get_load_prefix(NKnob* knob) {
+  return knob->load_prefix;
+}
+
+
 static void n_knob_destroy(GtkObject *object) {
   NKnob *knob;
   
@@ -212,6 +221,9 @@ static void n_knob_destroy(GtkObject *object) {
 
   knob = N_KNOB(object);
   knob->pixbuf = NULL;
+
+  if (knob->load_prefix) g_free(knob->load_prefix);
+  knob->load_prefix = NULL;
 
   if (GTK_OBJECT_CLASS(parent_class)->destroy)
     (*GTK_OBJECT_CLASS(parent_class)->destroy)(object);
@@ -244,8 +256,16 @@ static void n_knob_realize(GtkWidget *widget) {
    * set local pixbuf pointer to global
    * set last pixbuf pointer to NULL */
   if(pixbuf[i] == NULL){
-    pixbuf[i] = gdk_pixbuf_new_from_file_at_size(INSTALL_DIR"/drmr.lv2/knob.png",
-						 52*knob->size,knob->size,&gerror);
+    gchar* path;
+    if (knob->load_prefix)
+      path = g_build_path("/",knob->load_prefix,"knob.png",NULL);
+    else {
+      g_warning("Trying to show knob with no load prefix, looking only in cwd\n");
+      path = "knob.png";
+    }
+    pixbuf[i] = gdk_pixbuf_new_from_file_at_size(path,52*knob->size,knob->size,&gerror);
+    if (knob->load_prefix)
+      g_free(path);
     knob->pixbuf = pixbuf[i];
     pixbuf=g_realloc(pixbuf,sizeof(GdkPixbuf *) * (i+2));
     pixbuf[i+1] = NULL;                                                 
@@ -558,6 +578,7 @@ int main(int argc, char* argv[]) {
      
   /*  knob */
   knob = n_knob_new_with_range (-90, -90, 0, 1);
+  n_knob_set_load_prefix(N_KNOB(knob),"../");
   gtk_box_pack_start (GTK_BOX (vbox), knob, TRUE, FALSE, 0);
   g_signal_connect (G_OBJECT (knob), "change-value",
                     G_CALLBACK (changed_callback), NULL);

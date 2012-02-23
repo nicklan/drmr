@@ -52,6 +52,9 @@ typedef struct _NKnobClass   NKnobClass;
 struct _NKnob {
   GtkRange range;
 
+  /* image prefix */
+  gchar *load_prefix;
+
   /* State of widget (to do with user interaction) */
   guint8 state;
   gint saved_x, saved_y;
@@ -75,6 +78,9 @@ GtkWidget* n_knob_new_with_range (double value,
 				  double lower,
 				  double upper,
 				  double step);
+
+void   n_knob_set_load_prefix(NKnob* knob, gchar* prefix);
+gchar* n_knob_get_load_prefix(NKnob* knob);
 
 G_END_DECLS
 

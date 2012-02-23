@@ -50,11 +50,6 @@ target_link_libraries(drmr_ui ${LV2_LIBRARIES} ${GTK2_LIBRARIES} ${SNDFILE_LIBRA
 
 add_definitions ( -DPIC )
 
-set_target_properties (drmr_ui 
-  PROPERTIES 
-  DEFINE_SYMBOL "INSTALL_DIR=\"${CMAKE_INSTALL_PREFIX}/${LV2_INSTALL_DIR}\""
-)
-
 if (NOT USE_NKNOB)
   set_target_properties (drmr_ui
     PROPERTIES
@@ -82,7 +77,7 @@ set_target_properties ( htest
 target_link_libraries(knobt ${LV2_LIBRARIES} ${GTK2_LIBRARIES} ${SNDFILE_LIBRARIES} ${SAMPLERATE_LIBRARIES} ${EXPAT_LIBRARIES} m)
 set_target_properties ( knobt
   PROPERTIES
-  COMPILE_FLAGS "-D_TEST_N_KNOB -DINSTALL_DIR=\\\"${CMAKE_INSTALL_PREFIX}/${LV2_INSTALL_DIR}\\\""
+  COMPILE_FLAGS "-D_TEST_N_KNOB"
 )
 
 # config install
