@@ -10,6 +10,7 @@ DrMr is an LV2 sampler plugin.  It's main reason to exist is to give a way for l
 - LV2 controls for gain on first 32 samples of kit (see note 2 below)
 - LV2 controls for pan on first 32 samples of kit (see note 2 below)
 - GTK ui that can select a kit and control gain/pan on each sample
+- Custom knob widget for GTK ui based on phatknob that is both functional and awesome looking. (see wiki for screenshot)
 
 Hopefully coming soon:
 
@@ -30,13 +31,15 @@ DrMr is built with [CMake](http://www.cmake.org).
 To build it simply do (from this dir):
     mkdir build
     cd build
-    cmake ..
+    cmake ..    (or "cmake -DUSE_NKNOB=OFF .." if you want old style sliders)
 
 Then do:
     make
     make install
 
 to install.  There are some customizable variables for cmake.  To see them do "cmake -L".  The important ones are:
+
+USE_NKNOB - Use custom knob widget for controls instead of the default gtk sliders.  This defaults to ON.  Try turning it off if you are experiencing problems, or just prefer the sliders.
 
 LV2_INSTALL_DIR - The directory to install the DrMr plugin to. To install to your home directory, use "~/.lv2" and clear the CMAKE_INSTALL_PREFIX. This defaults to "lib/lv2" (this is relative to CMAKE_INSTALL_PREFIX, which is usually /usr/local)
 
