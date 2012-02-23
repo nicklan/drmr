@@ -353,7 +353,10 @@ instantiate(const LV2UI_Descriptor*   descriptor,
 
 static void cleanup(LV2UI_Handle handle) {
   DrMrUi* ui = (DrMrUi*)handle;
-  gtk_widget_destroy(ui->drmr_widget);
+  // seems qtractor likes to destory us
+  // before calling, avoid double-destroy
+  if (GTK_IS_WIDGET(ui->drmr_widget))
+    gtk_widget_destroy(ui->drmr_widget);
   if (ui->gain_sliders) free(ui->gain_sliders);
   if (ui->pan_sliders) free(ui->pan_sliders);
   free_kits(ui->kits);
