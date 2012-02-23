@@ -73,7 +73,7 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names,GtkWidget** 
   int row = 0;
   int col = 0;
   int si;
-  gchar buf[32];;
+  gchar buf[64];
   int rows = (samples/ui->cols);
   gtk_table_resize(ui->sample_table,rows,ui->cols);
   for(si = 0;si<samples;si++) {
@@ -83,7 +83,7 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names,GtkWidget** 
     GtkWidget* gain_label;
     GtkWidget* pan_label;
     gboolean slide_expand;
-    sprintf(buf,"<b>%s</b>",names[si]);
+    snprintf(buf,64,"<b>%s</b> (%i)",names[si],si);
 
     frame = gtk_frame_new(buf);
     gtk_label_set_use_markup(GTK_LABEL(gtk_frame_get_label_widget(GTK_FRAME(frame))),true);
