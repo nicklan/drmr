@@ -272,9 +272,6 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
   pthread_mutex_unlock(&drmr->load_mutex); 
 }
 
-static void activate  (LV2_Handle instance) {}
-static void deactivate(LV2_Handle instance) {}
-
 static void cleanup(LV2_Handle instance) {
   DrMr* drmr = (DrMr*)instance;
   pthread_cancel(drmr->load_thread);
@@ -294,9 +291,9 @@ static const LV2_Descriptor descriptor = {
   DRMR_URI,
   instantiate,
   connect_port,
-  activate,
+  NULL, // activate
   run,
-  deactivate,
+  NULL, // deactivate
   cleanup,
   extension_data
 };

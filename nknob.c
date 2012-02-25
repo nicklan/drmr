@@ -206,6 +206,7 @@ GtkWidget* n_knob_new_with_range (gdouble value, gdouble lower,
 }
 
 void   n_knob_set_load_prefix(NKnob* knob, gchar* prefix) {
+  if (knob->load_prefix) g_free(knob->load_prefix);
   knob->load_prefix = g_strdup(prefix);
 }
 gchar* n_knob_get_load_prefix(NKnob* knob) {
