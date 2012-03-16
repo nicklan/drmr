@@ -14,7 +14,7 @@ SET(SAMP_ZERO_POS "0" CACHE STRING "Default sample zero position 0=top left (tl)
 find_package(PkgConfig)
 pkg_check_modules(LV2 REQUIRED lv2-plugin>=1.0.4)
 pkg_check_modules(SNDFILE REQUIRED sndfile>=1.0.20)
-pkg_check_modules(SAMPLERATE REQUIRED samplerate>=0.1.8)
+pkg_check_modules(SAMPLERATE REQUIRED samplerate>=0.1.5)
 pkg_check_modules (GTK2 REQUIRED gtk+-2.0>=2.22.0)
 find_package (EXPAT REQUIRED)
 
