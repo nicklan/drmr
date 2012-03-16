@@ -8,6 +8,7 @@ set(CMAKE_C_FLAGS "-Wall")
 
 # Availble options
 option(USE_NKNOB  "Use custom NKnob widgets for gain/pan instead of Gtk sliders" ON)
+SET(SAMP_ZERO_POS "0" CACHE STRING "Default sample zero position 0=top left (tl) 1=bl 2=tr 3=br")
 
 # check for our various libraries
 find_package(PkgConfig)
@@ -51,11 +52,20 @@ target_link_libraries(drmr_ui ${LV2_LIBRARIES} ${GTK2_LIBRARIES} ${SNDFILE_LIBRA
 add_definitions ( -DPIC )
 
 if (NOT USE_NKNOB)
-  set_target_properties (drmr_ui
-    PROPERTIES
-    COMPILE_FLAGS "-DNO_NKNOB"
-  )
+  set (ui_compile_flags "-DNO_NKNOB")
 endif (NOT USE_NKNOB)
+
+if (SAMP_ZERO_POS GREATER "-1" AND SAMP_ZERO_POS LESS "4")
+   set (ui_compile_flags "${ui_compile_flags} -DDRMR_UI_ZERO_SAMP=${SAMP_ZERO_POS}")
+else (SAMP_ZERO_POS GREATER "-1" AND SAMP_ZERO_POS LESS "4")
+   message(WARNING "Invalid SAMP_ZERO_POS, defaulting to 0 \(top left\).  Valid values are 0,1,2,3")
+   set (ui_compile_flags "${ui_compile_flags} -DDRMR_UI_ZERO_SAMP=0")
+endif (SAMP_ZERO_POS GREATER "-1" AND SAMP_ZERO_POS LESS "4")
+
+set_target_properties (drmr_ui
+  PROPERTIES
+  COMPILE_FLAGS ${ui_compile_flags}
+)
 
 # Custom test commands
 add_executable ( htest

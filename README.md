@@ -43,6 +43,14 @@ to install.  There are some customizable variables for cmake.  To see them do "c
 
 USE_NKNOB - Use custom knob widget for controls instead of the default gtk sliders.  This defaults to ON.  Try turning it off if you are experiencing problems, or just prefer the sliders.
 
+SAMP_ZERO_POS - Controls where sample zero will position itself in the sample table.  This is just the default value, and can be changed in the ui when DrMr is running.  Valid values are:
+
+    0 - Top Left (default)
+    1 - Bottom Right (This will align with many drum machines and MIDI pads)
+    2 - Top Right
+    3 - Bottom Right
+Any other value will emit a warning and use 0.
+
 LV2_INSTALL_DIR - The directory to install the DrMr plugin to. To install to your home directory, use "~/.lv2" and clear the CMAKE_INSTALL_PREFIX. This defaults to "lib/lv2" (this is relative to CMAKE_INSTALL_PREFIX, which is usually /usr/local)
 
 You can also use "ccmake .." or "cmake-gui .." for a more interactive configuration process.

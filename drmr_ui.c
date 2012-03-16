@@ -43,6 +43,9 @@ typedef struct {
   gchar *bundle_path;
 
   int cols;
+  int startSamp;
+
+  gboolean forceUpdate;
 
   int samples;
 
@@ -78,6 +81,20 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names,GtkWidget** 
   gchar buf[64];
   int rows = (samples/ui->cols);
   gtk_table_resize(ui->sample_table,rows,ui->cols);
+
+  switch (ui->startSamp) {
+  case 1: // bottom left
+    row = rows-1;
+    break;
+  case 2: // top right
+    col = ui->cols-1;
+    break;
+  case 3: // bottom right
+    row = rows-1;
+    col = ui->cols-1;
+    break;
+  }
+
   for(si = 0;si<samples;si++) {
     GtkWidget *frame,*hbox,*gain_vbox,*pan_vbox;
     GtkWidget* gain_slider;
@@ -148,10 +165,25 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names,GtkWidget** 
 
     gtk_table_attach_defaults(ui->sample_table,frame,col,col+1,row,row+1);
 
-    col++;
-    if (col >= ui->cols) {
-      col = 0;
-      row++;
+    if (ui->startSamp > 1) {
+      col--;
+      if (col < 0) {
+	if (ui->startSamp == 2)
+	  row++;
+	else
+	  row--;
+	col = ui->cols-1;
+      }
+    }
+    else {
+      col++;
+      if (col >= ui->cols) {
+	if (ui->startSamp == 0)
+	  row++;
+	else
+	  row--;
+	col = 0;
+      }
     }
   }
   gtk_widget_queue_resize(GTK_WIDGET(ui->sample_table));
@@ -192,7 +224,8 @@ static void fill_kit_combo(GtkComboBox* combo, kits* kits) {
 static gboolean idle = FALSE;
 static gboolean kit_callback(gpointer data) {
   DrMrUi* ui = (DrMrUi*)data;
-  if (ui->kitReq != ui->curKit) {
+  if (ui->forceUpdate || (ui->kitReq != ui->curKit)) {
+    ui->forceUpdate = false;
     int samples = (ui->kitReq<ui->kits->num_kits && ui->kitReq >= 0)?
       ui->kits->kits[ui->kitReq].samples:
       0;
@@ -254,11 +287,57 @@ static void kit_combobox_changed(GtkComboBox* box, gpointer data) {
   g_timeout_add(100,kit_callback,ui);
 }
 
+static void position_combobox_changed(GtkComboBox* box, gpointer data) {
+  DrMrUi* ui = (DrMrUi*)data;
+  gint ss = gtk_combo_box_get_active (GTK_COMBO_BOX(box));
+  if (ss != ui->startSamp) {
+    ui->startSamp = ss;
+    ui->forceUpdate = true;
+    kit_callback(ui);
+  }
+}
+
+static GtkWidget *create_position_combo(void)
+{
+  GtkWidget *combo;
+  GtkListStore *list_store;
+  GtkCellRenderer *cell;
+  GtkTreeIter iter;
+
+  list_store = gtk_list_store_new(1, G_TYPE_STRING);
+
+  gtk_list_store_append(list_store, &iter);
+  gtk_list_store_set (list_store, &iter, 0, "Top Left", -1);
+  gtk_list_store_append(list_store, &iter);
+  gtk_list_store_set (list_store, &iter, 0, "Bottom Left", -1);
+  gtk_list_store_append(list_store, &iter);
+  gtk_list_store_set (list_store, &iter, 0, "Top Right", -1);
+  gtk_list_store_append(list_store, &iter);
+  gtk_list_store_set (list_store, &iter, 0, "Bottom Right", -1);
+
+  combo = gtk_combo_box_new_with_model(GTK_TREE_MODEL(list_store));
+
+#ifdef DRMR_UI_ZERO_SAMP
+  gtk_combo_box_set_active(GTK_COMBO_BOX(combo),DRMR_UI_ZERO_SAMP);
+#else
+  gtk_combo_box_set_active(GTK_COMBO_BOX(combo),0);
+#endif
+
+
+  g_object_unref(list_store);
+
+  cell = gtk_cell_renderer_text_new();
+  gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(combo), cell, TRUE);
+  gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(combo), cell, "text", 0, NULL);
+
+  return combo;
+}
+
 static void build_drmr_ui(DrMrUi* ui) {
   GtkWidget *drmr_ui_widget;
-  GtkWidget *opts_hbox, 
+  GtkWidget *opts_hbox1, *opts_hbox2, 
     *kit_combo_box, *kit_label, *no_kit_label,
-    *base_label, *base_spin;
+    *base_label, *base_spin, *position_label, *position_combo_box;
   GtkCellRenderer *cell_rend;
   GtkAdjustment *base_adj;
   
@@ -267,7 +346,8 @@ static void build_drmr_ui(DrMrUi* ui) {
 
   ui->kit_store = gtk_list_store_new(1,G_TYPE_STRING);
 
-  opts_hbox = gtk_hbox_new(false,0);
+  opts_hbox1 = gtk_hbox_new(false,0);
+  opts_hbox2 = gtk_hbox_new(false,0);
   kit_combo_box = gtk_combo_box_new_with_model(GTK_TREE_MODEL(ui->kit_store));
   kit_label = gtk_label_new("Kit:");
 
@@ -287,18 +367,32 @@ static void build_drmr_ui(DrMrUi* ui) {
 			5.0,0.0)); // page adj/size
   base_spin = gtk_spin_button_new(base_adj, 1.0, 0);
 
-  gtk_box_pack_start(GTK_BOX(opts_hbox),kit_label,
+  position_label = gtk_label_new("Sample Zero Position: ");
+  position_combo_box = create_position_combo();
+
+  gtk_box_pack_start(GTK_BOX(opts_hbox1),kit_label,
 		     false,false,15);
-  gtk_box_pack_start(GTK_BOX(opts_hbox),no_kit_label,
+  gtk_box_pack_start(GTK_BOX(opts_hbox1),no_kit_label,
 		     true,true,0);
-  gtk_box_pack_start(GTK_BOX(opts_hbox),kit_combo_box,
+  gtk_box_pack_start(GTK_BOX(opts_hbox1),kit_combo_box,
 		     true,true,0);
-  gtk_box_pack_start(GTK_BOX(opts_hbox),base_label,
+  gtk_box_pack_start(GTK_BOX(opts_hbox1),base_label,
 		     false,false,15);
-  gtk_box_pack_start(GTK_BOX(opts_hbox),base_spin,
+  gtk_box_pack_start(GTK_BOX(opts_hbox1),base_spin,
 		     true,true,0);
-  gtk_box_pack_start(GTK_BOX(drmr_ui_widget),opts_hbox,
+
+  gtk_box_pack_start(GTK_BOX(opts_hbox2),position_label,
+		     false,false,15);
+  gtk_box_pack_start(GTK_BOX(opts_hbox2),position_combo_box,
+		     false,false,0);
+
+  gtk_box_pack_start(GTK_BOX(drmr_ui_widget),gtk_hseparator_new(),
 		     false,false,5);
+  gtk_box_pack_start(GTK_BOX(drmr_ui_widget),opts_hbox1,
+		     false,false,5);
+  gtk_box_pack_start(GTK_BOX(drmr_ui_widget),opts_hbox2,
+		     false,false,5);
+
 
 
   ui->drmr_widget = drmr_ui_widget;
@@ -310,6 +404,7 @@ static void build_drmr_ui(DrMrUi* ui) {
 
   g_signal_connect(G_OBJECT(kit_combo_box),"changed",G_CALLBACK(kit_combobox_changed),ui);
   g_signal_connect(G_OBJECT(base_spin),"value-changed",G_CALLBACK(base_changed),ui);
+  g_signal_connect(G_OBJECT(position_combo_box),"changed",G_CALLBACK(position_combobox_changed),ui);
 
   gtk_widget_show_all(drmr_ui_widget);
   gtk_widget_hide(no_kit_label);
@@ -348,7 +443,15 @@ instantiate(const LV2UI_Descriptor*   descriptor,
   ui->pan_vals  = malloc(32*sizeof(float));
   memset(ui->pan_vals,0,32*sizeof(float));
   ui->cols = 4;
+  ui->forceUpdate = false;
   fill_kit_combo(ui->kit_combo, ui->kits);
+
+#ifdef DRMR_UI_ZERO_SAMP
+  ui->startSamp = DRMR_UI_ZERO_SAMP;
+#else
+  ui->startSamp = 0;
+#endif
+
 
   *widget = ui->drmr_widget;
 
