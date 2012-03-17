@@ -80,6 +80,7 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names,GtkWidget** 
   int si;
   gchar buf[64];
   int rows = (samples/ui->cols);
+  if (samples % ui->cols != 0) rows++;
   gtk_table_resize(ui->sample_table,rows,ui->cols);
 
   switch (ui->startSamp) {
