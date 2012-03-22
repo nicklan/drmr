@@ -81,17 +81,16 @@ instantiate(const LV2_Descriptor*     descriptor,
 
   // Map midi uri
   while(*features) {
-    if (!strcmp((*features)->URI, LV2_URI_MAP_URI)) {
-      drmr->map = (LV2_URI_Map_Feature *)((*features)->data);
-      drmr->uris.midi_event = drmr->map->uri_to_id
-	(drmr->map->callback_data,
-	 "http://lv2plug.in/ns/ext/event",
-	 "http://lv2plug.in/ns/ext/midi#MidiEvent");
+    if (!strcmp((*features)->URI, LV2_URID_URI "#map")) {
+      drmr->map = (LV2_URID_Map *)((*features)->data);
+      drmr->uris.midi_event = 
+	drmr->map->map(drmr->map->handle,
+		       "http://lv2plug.in/ns/ext/midi#MidiEvent");
     }
     features++;
   }
   if (!drmr->map) {
-    fprintf(stderr, "LV2 host does not support uri-map.\n");
+    fprintf(stderr, "LV2 host does not support urid#map.\n");
     free(drmr);
     return 0;
   }
@@ -126,8 +125,8 @@ connect_port(LV2_Handle instance,
   DrMr* drmr = (DrMr*)instance;
   DrMrPortIndex port_index = (DrMrPortIndex)port;
   switch (port_index) {
-  case DRMR_MIDI:
-    drmr->midi_port = (LV2_Event_Buffer*)data;
+  case DRMR_CONTROL:
+    drmr->control_port = (LV2_Atom_Sequence*)data;
     break;
   case DRMR_LEFT:
     drmr->left = (float*)data;
@@ -191,42 +190,37 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
   if (kitInt != drmr->curKit) // requested a new kit
     pthread_cond_signal(&drmr->load_cond);
 
-  LV2_Event_Iterator eit;
-  if (drmr->midi_port && lv2_event_begin(&eit,drmr->midi_port)) { // if we have any events
-    LV2_Event *cur_ev;
-    uint8_t* data;
-    while (lv2_event_is_valid(&eit)) {
-      cur_ev = lv2_event_get(&eit,&data);
-      if (cur_ev->type == drmr->uris.midi_event) {
-	//int channel = *data & 15;
-	switch ((*data) >> 4) {
-	case 8:  // ignore note-offs for now, should probably be a setting
-	  //if (drmr->cur_samp) drmr->cur_samp->active = 0;
-	  break;
-	case 9: {
-	  uint8_t nn = data[1];
-	  nn-=baseNote;
-	  // need to mutex this to avoid getting the samples array
-	  // changed after the check that the midi-note is valid
-	  pthread_mutex_lock(&drmr->load_mutex); 
-	  if (nn >= 0 && nn < drmr->num_samples) {
-	    if (drmr->samples[nn].layer_count > 0) {
-	      layer_to_sample(drmr->samples+nn,*(drmr->gains[nn]));
-	      if (drmr->samples[nn].limit == 0)
-		fprintf(stderr,"Failed to find layer at: %i for %f\n",nn,*drmr->gains[nn]);
-	    }
-	    drmr->samples[nn].active = 1;
-	    drmr->samples[nn].offset = 0;
+  LV2_SEQUENCE_FOREACH(drmr->control_port, i) {
+    LV2_Atom_Event* const ev = lv2_sequence_iter_get(i);
+    if (ev->body.type == drmr->uris.midi_event) {
+      uint8_t* const data = (uint8_t* const)(ev + 1);
+      //int channel = *data & 15;
+      switch ((*data) >> 4) {
+      case 8:  // ignore note-offs for now, should probably be a setting
+	//if (drmr->cur_samp) drmr->cur_samp->active = 0;
+	break;
+      case 9: {
+	uint8_t nn = data[1];
+	nn-=baseNote;
+	// need to mutex this to avoid getting the samples array
+	// changed after the check that the midi-note is valid
+	pthread_mutex_lock(&drmr->load_mutex); 
+	if (nn >= 0 && nn < drmr->num_samples) {
+	  if (drmr->samples[nn].layer_count > 0) {
+	    layer_to_sample(drmr->samples+nn,*(drmr->gains[nn]));
+	    if (drmr->samples[nn].limit == 0)
+	      fprintf(stderr,"Failed to find layer at: %i for %f\n",nn,*drmr->gains[nn]);
 	  }
-	  pthread_mutex_unlock(&drmr->load_mutex);
-	  break;
+	  drmr->samples[nn].active = 1;
+	  drmr->samples[nn].offset = 0;
 	}
-	default:
-	  printf("Unhandeled status: %i\n",(*data)>>4);
-	}
-      } else printf("unrecognized event\n");
-      lv2_event_increment(&eit);
-    } 
+	pthread_mutex_unlock(&drmr->load_mutex);
+	break;
+      }
+      default:
+	printf("Unhandeled status: %i\n",(*data)>>4);
+      }
+    } else printf("unrecognized event\n");
   }
 
   for(i = 0;i<n_samples;i++) {

@@ -20,10 +20,11 @@
 #include <sndfile.h>
 #include <pthread.h>
 
+#include "lv2/lv2plug.in/ns/ext/atom/forge.h"
+// util includes atom.h
+#include "lv2/lv2plug.in/ns/ext/atom/util.h"
 #include "lv2/lv2plug.in/ns/lv2core/lv2.h"
-#include "lv2/lv2plug.in/ns/ext/event/event.h"
-#include "lv2/lv2plug.in/ns/ext/event/event-helpers.h"
-#include "lv2/lv2plug.in/ns/ext/uri-map/uri-map.h"
+#include "lv2/lv2plug.in/ns/ext/urid/urid.h"
 
 // drumkit scanned from a hydrogen xml file
 typedef struct {
@@ -67,7 +68,7 @@ typedef struct {
 #define GAIN_MAX 6.0f
 
 typedef enum {
-  DRMR_MIDI = 0,
+  DRMR_CONTROL = 0,
   DRMR_LEFT,
   DRMR_RIGHT,
   DRMR_KITNUM,
@@ -143,7 +144,7 @@ typedef struct {
   // Ports
   float* left;
   float* right;
-  LV2_Event_Buffer *midi_port;
+  LV2_Atom_Sequence *control_port;
 
   // params
   float** gains;
@@ -153,9 +154,9 @@ typedef struct {
   double rate;
 
   // URIs
-  LV2_URI_Map_Feature* map;
+  LV2_URID_Map* map;
   struct {
-    uint32_t midi_event;
+    LV2_URID midi_event;
   } uris;
 
   // Available kits

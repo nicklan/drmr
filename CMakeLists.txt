@@ -51,8 +51,15 @@ target_link_libraries(drmr_ui ${LV2_LIBRARIES} ${GTK2_LIBRARIES} ${SNDFILE_LIBRA
 
 add_definitions ( -DPIC )
 
+set_target_properties (drmr
+  PROPERTIES
+  COMPILE_FLAGS "-std=gnu99"
+)
+
+set (ui_compile_flags "-std=gnu99")
+
 if (NOT USE_NKNOB)
-  set (ui_compile_flags "-DNO_NKNOB")
+  set (ui_compile_flags "${ui_compile_flags} -DNO_NKNOB")
 endif (NOT USE_NKNOB)
 
 if (SAMP_ZERO_POS GREATER "-1" AND SAMP_ZERO_POS LESS "4")
