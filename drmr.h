@@ -137,31 +137,40 @@ typedef enum {
   DRMR_PAN_THIRTY,
   DRMR_PAN_THIRTYONE,
   DRMR_PAN_THIRTYTWO,
+  DRMR_KITPATH,
   DRMR_NUM_PORTS
 } DrMrPortIndex;
+
+typedef struct {
+  LV2_URID midi_event;
+  LV2_URID ui_msg;
+  LV2_URID kit_path;
+  LV2_URID atom_eventTransfer;
+  LV2_URID atom_resource;
+} drmr_uris;
 
 typedef struct {
   // Ports
   float* left;
   float* right;
   LV2_Atom_Sequence *control_port;
+  LV2_Atom_Sequence *kitpath_port;
 
   // params
   float** gains;
   float** pans;
-  float* kitReq;
   float* baseNote;
   double rate;
 
   // URIs
   LV2_URID_Map* map;
-  struct {
-    LV2_URID midi_event;
-  } uris;
+  drmr_uris uris;
 
   // Available kits
   kits* kits;
-  int curKit;
+  char* current_path;
+  char** request_buf;
+  int curReq;
 
   // Samples
   drmr_sample* samples;
@@ -173,6 +182,24 @@ typedef struct {
   pthread_t load_thread;
 
 } DrMr;
+
+static inline
+void map_drmr_uris(LV2_URID_Map *map,
+		   drmr_uris *uris) {
+  uris->midi_event =
+    map->map(map->handle,
+	     "http://lv2plug.in/ns/ext/midi#MidiEvent");
+  uris->ui_msg =
+    map->map(map->handle,
+	     DRMR_URI "#uimsg");
+  uris->kit_path =
+    map->map(map->handle,
+	     DRMR_URI "#kitpath");
+  uris->atom_eventTransfer = 
+    map->map(map->handle, LV2_ATOM__eventTransfer);
+  uris->atom_resource = 
+    map->map(map->handle, LV2_ATOM__Resource);
+}
 
 
 #endif // DRMR_H

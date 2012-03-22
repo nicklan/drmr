@@ -21,6 +21,11 @@
 #include "drmr.h"
 #include "drmr_hydrogen.h"
 #include "nknob.h"
+
+#include "lv2/lv2plug.in/ns/ext/atom/atom.h"
+#include "lv2/lv2plug.in/ns/ext/atom/forge.h"
+#include "lv2/lv2plug.in/ns/ext/atom/util.h"
+#include "lv2/lv2plug.in/ns/ext/urid/urid.h"
 #include "lv2/lv2plug.in/ns/extensions/ui/ui.h"
 
 #define DRMR_UI_URI "http://github.com/nicklan/drmr#ui"
@@ -28,6 +33,10 @@
 typedef struct {
   LV2UI_Write_Function write;
   LV2UI_Controller     controller;
+  LV2_Atom_Forge forge;
+
+  LV2_URID_Map *map;
+  drmr_uris uris;
 
   GtkWidget *drmr_widget;
   GtkTable *sample_table;
@@ -271,12 +280,30 @@ static gboolean kit_callback(gpointer data) {
   return FALSE; // don't keep calling
 }
 
+static LV2_Atom* build_path_message(DrMrUi *ui, const char* path) {
+  LV2_Atom_Forge_Frame set_frame;
+  LV2_Atom* msg = (LV2_Atom*)lv2_atom_forge_resource
+    (&ui->forge, &set_frame, 1, ui->uris.ui_msg);
+  lv2_atom_forge_property_head(&ui->forge, ui->uris.kit_path,0);
+  lv2_atom_forge_path(&ui->forge, path, strlen(path));
+  lv2_atom_forge_pop(&ui->forge,&set_frame);
+  return msg;
+}
+
 static void kit_combobox_changed(GtkComboBox* box, gpointer data) {
   DrMrUi* ui = (DrMrUi*)data;
   gint new_kit = gtk_combo_box_get_active (GTK_COMBO_BOX(box));
-  float fkit = (float)new_kit;
-  if (ui->curKit != new_kit)
-    ui->write(ui->controller,DRMR_KITNUM,4,0,&fkit);
+
+  if (ui->curKit != new_kit) {
+    uint8_t msg_buf[1024];
+    lv2_atom_forge_set_buffer(&ui->forge, msg_buf, 1024);
+    LV2_Atom *msg = build_path_message(ui,ui->kits->kits[new_kit].path);
+
+    ui->write(ui->controller,DRMR_CONTROL,
+	      lv2_atom_total_size(msg),
+	      ui->uris.atom_eventTransfer,
+	      msg);
+  }
 
   /* Call our update func after 100 milliseconds.
    *
@@ -424,10 +451,26 @@ instantiate(const LV2UI_Descriptor*   descriptor,
   ui->write      = write_function;
   ui->controller = controller;
   ui->drmr_widget = NULL;
+  ui->map = NULL;
   ui->curKit = -1;
   ui->samples = 0;
-  ui->bundle_path = g_strdup(bundle_path);
   *widget = NULL;
+
+  while(*features) {
+    if (!strcmp((*features)->URI, LV2_URID_URI "#map"))
+      ui->map = (LV2_URID_Map *)((*features)->data);
+    features++;
+  }
+  if (!ui->map) {
+    fprintf(stderr, "LV2 host does not support urid#map.\n");
+    free(ui);
+    return 0;
+  } 
+  map_drmr_uris(ui->map,&(ui->uris));
+
+  ui->bundle_path = g_strdup(bundle_path);
+
+  lv2_atom_forge_init(&ui->forge,ui->map);
 
   build_drmr_ui(ui);
 
@@ -493,19 +536,7 @@ port_event(LV2UI_Handle handle,
   DrMrPortIndex index = (DrMrPortIndex)port_index;
   DrMrUi* ui = (DrMrUi*)handle;
 
-  if (index == DRMR_KITNUM) {
-    if (format != 0) 
-      fprintf(stderr,"Invalid format for kitnum: %i\n",format);
-    else {
-      int kit = (int)(*((float*)buffer));
-      ui->kitReq = kit;
-      if (!idle) {
-	idle = TRUE;
-	g_idle_add(kit_callback,ui);
-      }
-    }
-  }
-  else if (index == DRMR_BASENOTE) {
+  if (index == DRMR_BASENOTE) {
     int base = (int)(*((float*)buffer));
     if (base >= 21 && base <= 107) {
       setBaseLabel((int)base);

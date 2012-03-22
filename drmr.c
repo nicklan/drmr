@@ -22,35 +22,39 @@
 #include "drmr.h"
 #include "drmr_hydrogen.h"
 
+#define REQ_BUF_SIZE 10
+
 static void* load_thread(void* arg) {
   DrMr* drmr = (DrMr*)arg;
   drmr_sample *loaded_samples,*old_samples;
   int loaded_count, old_scount;
+  char *request;
   for(;;) {
     pthread_mutex_lock(&drmr->load_mutex);
     pthread_cond_wait(&drmr->load_cond,
 		      &drmr->load_mutex);
     pthread_mutex_unlock(&drmr->load_mutex); 
-    int request = (int)floorf(*(drmr->kitReq));
-    if (request == drmr->curKit) continue;
     old_samples = drmr->samples;
     old_scount = drmr->num_samples;
-    if (request < 0 || request >= drmr->kits->num_kits) {
+    request = drmr->request_buf[drmr->curReq];
+    loaded_samples = load_hydrogen_kit(request,drmr->rate,&loaded_count);
+    if (!loaded_samples) {
+      fprintf(stderr,"Failed to load kit at: %s\n",request);
       pthread_mutex_lock(&drmr->load_mutex);
       drmr->num_samples = 0;
       drmr->samples = NULL;
       pthread_mutex_unlock(&drmr->load_mutex); 
-    } else {
-      printf("loading kit: %i\n",request);
-      loaded_samples = load_hydrogen_kit(drmr->kits->kits[request].path,drmr->rate,&loaded_count);
+    }
+    else {
       // just lock for the critical moment when we swap in the new kit
+      printf("loaded kit at: %s\n",request);
       pthread_mutex_lock(&drmr->load_mutex);
       drmr->samples = loaded_samples;
       drmr->num_samples = loaded_count;
       pthread_mutex_unlock(&drmr->load_mutex); 
     }
     if (old_scount > 0) free_samples(old_samples,old_scount);
-    drmr->curKit = request;
+    drmr->current_path = request;
   }
   return 0;
 }
@@ -65,7 +69,8 @@ instantiate(const LV2_Descriptor*     descriptor,
   drmr->map = NULL;
   drmr->samples = NULL;
   drmr->num_samples = 0;
-  drmr->curKit = -1;
+  drmr->current_path = NULL;
+  drmr->curReq = -1;
   drmr->rate = rate;
 
   if (pthread_mutex_init(&drmr->load_mutex, 0)) {
@@ -79,21 +84,17 @@ instantiate(const LV2_Descriptor*     descriptor,
     return 0;
   }
 
-  // Map midi uri
   while(*features) {
-    if (!strcmp((*features)->URI, LV2_URID_URI "#map")) {
+    if (!strcmp((*features)->URI, LV2_URID_URI "#map"))
       drmr->map = (LV2_URID_Map *)((*features)->data);
-      drmr->uris.midi_event = 
-	drmr->map->map(drmr->map->handle,
-		       "http://lv2plug.in/ns/ext/midi#MidiEvent");
-    }
     features++;
   }
   if (!drmr->map) {
     fprintf(stderr, "LV2 host does not support urid#map.\n");
     free(drmr);
     return 0;
-  }
+  } 
+  map_drmr_uris(drmr->map,&(drmr->uris));
   
   drmr->kits = scan_kits();
   if (!drmr->kits) {
@@ -107,6 +108,9 @@ instantiate(const LV2_Descriptor*     descriptor,
     free(drmr);
     return 0;
   }
+
+  drmr->request_buf = malloc(REQ_BUF_SIZE*sizeof(char*));
+  memset(drmr->request_buf,0,REQ_BUF_SIZE*sizeof(char*));
 
   drmr->gains = malloc(32*sizeof(float*));
   drmr->pans = malloc(32*sizeof(float*));
@@ -128,6 +132,9 @@ connect_port(LV2_Handle instance,
   case DRMR_CONTROL:
     drmr->control_port = (LV2_Atom_Sequence*)data;
     break;
+  case DRMR_KITPATH:
+    drmr->kitpath_port = (LV2_Atom_Sequence*)data;
+    break;
   case DRMR_LEFT:
     drmr->left = (float*)data;
     break;
@@ -135,7 +142,7 @@ connect_port(LV2_Handle instance,
     drmr->right = (float*)data;
     break;
   case DRMR_KITNUM:
-    if(data) drmr->kitReq = (float*)data;
+    //if(data) drmr->kitReq = (float*)data;
     break;
   case DRMR_BASENOTE:
     if (data) drmr->baseNote = (float*)data;
@@ -182,13 +189,10 @@ static inline void layer_to_sample(drmr_sample *sample, float gain) {
 #define DB_CO(g) ((g) > GAIN_MIN ? powf(10.0f, (g) * 0.05f) : 0.0f)
 
 static void run(LV2_Handle instance, uint32_t n_samples) {
-  int i,kitInt,baseNote;
+  int i,baseNote;
   DrMr* drmr = (DrMr*)instance;
 
-  kitInt = (int)floorf(*(drmr->kitReq));
   baseNote = (int)floorf(*(drmr->baseNote));
-  if (kitInt != drmr->curKit) // requested a new kit
-    pthread_cond_signal(&drmr->load_cond);
 
   LV2_SEQUENCE_FOREACH(drmr->control_port, i) {
     LV2_Atom_Event* const ev = lv2_sequence_iter_get(i);
@@ -220,8 +224,35 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
       default:
 	printf("Unhandeled status: %i\n",(*data)>>4);
       }
-    } else printf("unrecognized event\n");
+    } 
+    else if (ev->body.type == drmr->uris.atom_resource) {
+      const LV2_Atom_Object *obj = (LV2_Atom_Object*)&ev->body;
+      if (obj->body.otype == drmr->uris.ui_msg) {
+	const LV2_Atom* path = NULL;
+	lv2_object_get(obj, drmr->uris.kit_path, &path, 0);
+	if (!path) 
+	  fprintf(stderr,"Got UI message without kit_path, ignoring\n");
+	else {
+	  int reqPos = (drmr->curReq+1)%REQ_BUF_SIZE;
+	  char *tmp = NULL;
+	  if (reqPos >= 0 &&
+	      drmr->request_buf[reqPos])
+	    tmp = drmr->request_buf[reqPos];
+	  drmr->request_buf[reqPos] = strdup(LV2_ATOM_BODY(path));
+	  drmr->curReq = reqPos;
+	  if (tmp) free(tmp);
+	}
+      }
+    }
+    else printf("unrecognized event\n");
   }
+
+  if ((drmr->curReq >= 0) &&
+      drmr->request_buf[drmr->curReq] && 
+      (!drmr->current_path ||
+       strcmp(drmr->current_path,
+	      drmr->request_buf[drmr->curReq])))
+    pthread_cond_signal(&drmr->load_cond);
 
   for(i = 0;i<n_samples;i++) {
     drmr->left[i] = 0.0f;
