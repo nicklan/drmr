@@ -137,7 +137,7 @@ typedef enum {
   DRMR_PAN_THIRTY,
   DRMR_PAN_THIRTYONE,
   DRMR_PAN_THIRTYTWO,
-  DRMR_KITPATH,
+  DRMR_CORE_EVENT,
   DRMR_NUM_PORTS
 } DrMrPortIndex;
 
@@ -154,7 +154,9 @@ typedef struct {
   float* left;
   float* right;
   LV2_Atom_Sequence *control_port;
-  LV2_Atom_Sequence *kitpath_port;
+  LV2_Atom_Sequence *core_event_port;
+
+  LV2_Atom_Forge forge;
 
   // params
   float** gains;
@@ -166,8 +168,7 @@ typedef struct {
   LV2_URID_Map* map;
   drmr_uris uris;
 
-  // Available kits
-  kits* kits;
+  // Kit info
   char* current_path;
   char** request_buf;
   int curReq;

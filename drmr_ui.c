@@ -304,15 +304,6 @@ static void kit_combobox_changed(GtkComboBox* box, gpointer data) {
 	      ui->uris.atom_eventTransfer,
 	      msg);
   }
-
-  /* Call our update func after 100 milliseconds.
-   *
-   * This is a hack to deal with hosts that don't send
-   * back port_events properly after the write function.
-   * In particular, qtractor doesn't, at the moment.
-   */
-  ui->kitReq = new_kit;
-  g_timeout_add(100,kit_callback,ui);
 }
 
 static void position_combobox_changed(GtkComboBox* box, gpointer data) {
@@ -536,7 +527,32 @@ port_event(LV2UI_Handle handle,
   DrMrPortIndex index = (DrMrPortIndex)port_index;
   DrMrUi* ui = (DrMrUi*)handle;
 
-  if (index == DRMR_BASENOTE) {
+  if (index == DRMR_CORE_EVENT) {
+    if (format == ui->uris.atom_eventTransfer) {
+      LV2_Atom* atom = (LV2_Atom*)buffer;
+      if (atom->type == ui->uris.atom_resource) {
+	LV2_Atom_Object* obj = (LV2_Atom_Object*)atom;
+	const LV2_Atom* path = NULL;
+	lv2_object_get(obj, ui->uris.kit_path, &path, 0);
+	if (!path)
+	  fprintf(stderr,"Got UI message without kit_path, ignoring\n");
+	else {
+	  char *kitpath = LV2_ATOM_BODY(path);
+	  int i;
+	  for(i = 0;i < ui->kits->num_kits;i++)
+	    if (!strcmp(ui->kits->kits[i].path,kitpath))
+	      break;
+	  if (i < ui->kits->num_kits) {
+	    ui->kitReq = i;
+	    g_idle_add(kit_callback,ui);
+	  }
+	}
+      } else
+	fprintf(stderr, "Unknown message type.\n");
+    } else
+      fprintf(stderr, "Unknown format.\n");
+  }
+  else if (index == DRMR_BASENOTE) {
     int base = (int)(*((float*)buffer));
     if (base >= 21 && base <= 107) {
       setBaseLabel((int)base);

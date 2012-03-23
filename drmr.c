@@ -24,6 +24,8 @@
 
 #define REQ_BUF_SIZE 10
 
+static int current_kit_changed = 0;
+
 static void* load_thread(void* arg) {
   DrMr* drmr = (DrMr*)arg;
   drmr_sample *loaded_samples,*old_samples;
@@ -55,6 +57,7 @@ static void* load_thread(void* arg) {
     }
     if (old_scount > 0) free_samples(old_samples,old_scount);
     drmr->current_path = request;
+    current_kit_changed = 1;
   }
   return 0;
 }
@@ -96,12 +99,7 @@ instantiate(const LV2_Descriptor*     descriptor,
   } 
   map_drmr_uris(drmr->map,&(drmr->uris));
   
-  drmr->kits = scan_kits();
-  if (!drmr->kits) {
-    fprintf(stderr, "No drum kits found\n");
-    free(drmr);
-    return 0;
-  }
+  lv2_atom_forge_init(&drmr->forge, drmr->map);
 
   if (pthread_create(&drmr->load_thread, 0, load_thread, drmr)) {
     fprintf(stderr, "Could not initialize loading thread.\n");
@@ -132,8 +130,8 @@ connect_port(LV2_Handle instance,
   case DRMR_CONTROL:
     drmr->control_port = (LV2_Atom_Sequence*)data;
     break;
-  case DRMR_KITPATH:
-    drmr->kitpath_port = (LV2_Atom_Sequence*)data;
+  case DRMR_CORE_EVENT:
+    drmr->core_event_port = (LV2_Atom_Sequence*)data;
     break;
   case DRMR_LEFT:
     drmr->left = (float*)data;
@@ -159,6 +157,16 @@ connect_port(LV2_Handle instance,
     int poff = port_index - DRMR_PAN_ONE;
     drmr->pans[poff] = (float*)data;
   }
+}
+
+static inline LV2_Atom* build_update_message(DrMr *drmr, const char* kit) {
+  LV2_Atom_Forge_Frame set_frame;
+  LV2_Atom* msg = (LV2_Atom*)lv2_atom_forge_resource
+    (&drmr->forge, &set_frame, 1, drmr->uris.ui_msg);
+  lv2_atom_forge_property_head(&drmr->forge, drmr->uris.kit_path,0);
+  lv2_atom_forge_string(&drmr->forge, kit, strlen(kit));
+  lv2_atom_forge_pop(&drmr->forge,&set_frame);
+  return msg;
 }
 
 static inline void layer_to_sample(drmr_sample *sample, float gain) {
@@ -193,6 +201,13 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
   DrMr* drmr = (DrMr*)instance;
 
   baseNote = (int)floorf(*(drmr->baseNote));
+
+  const uint32_t event_capacity = drmr->core_event_port->atom.size;
+  lv2_atom_forge_set_buffer(&drmr->forge,
+			    (uint8_t*)drmr->core_event_port,
+			    event_capacity);
+  LV2_Atom_Forge_Frame seq_frame;
+  lv2_atom_forge_sequence_head(&drmr->forge, &seq_frame, 0);
 
   LV2_SEQUENCE_FOREACH(drmr->control_port, i) {
     LV2_Atom_Event* const ev = lv2_sequence_iter_get(i);
@@ -254,6 +269,14 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	      drmr->request_buf[drmr->curReq])))
     pthread_cond_signal(&drmr->load_cond);
 
+  if (current_kit_changed) {
+    current_kit_changed = 0;
+    lv2_atom_forge_frame_time(&drmr->forge, 0);
+    build_update_message(drmr,drmr->current_path);
+  }
+
+  lv2_atom_forge_pop(&drmr->forge, &seq_frame);
+
   for(i = 0;i<n_samples;i++) {
     drmr->left[i] = 0.0f;
     drmr->right[i] = 0.0f;
@@ -303,7 +326,6 @@ static void cleanup(LV2_Handle instance) {
   pthread_join(drmr->load_thread, 0);
   if (drmr->num_samples > 0)
     free_samples(drmr->samples,drmr->num_samples);
-  free_kits(drmr->kits);
   free(drmr->gains);
   free(instance);
 }
