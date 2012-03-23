@@ -29,6 +29,7 @@
 #include "lv2/lv2plug.in/ns/extensions/ui/ui.h"
 
 #define DRMR_UI_URI "http://github.com/nicklan/drmr#ui"
+#define NO_KIT_STRING "[No Current Kit]"
 
 typedef struct {
   LV2UI_Write_Function write;
@@ -39,6 +40,7 @@ typedef struct {
   drmr_uris uris;
 
   GtkWidget *drmr_widget;
+  GtkLabel *current_kit_label;
   GtkTable *sample_table;
   GtkComboBox *kit_combo;
   GtkWidget *no_kit_label;
@@ -261,11 +263,13 @@ static gboolean kit_callback(gpointer data) {
       fill_sample_table(ui,samples,ui->kits->kits[ui->kitReq].sample_names,gain_sliders,pan_sliders);
       gtk_box_pack_start(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),
 			 true,true,5);
-      gtk_box_reorder_child(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),0);
+      gtk_box_reorder_child(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),1);
       gtk_widget_show_all(GTK_WIDGET(ui->sample_table));
       ui->samples = samples;
       ui->gain_sliders = gain_sliders;
       ui->pan_sliders = pan_sliders;
+
+      gtk_label_set_text(ui->current_kit_label,ui->kits->kits[ui->kitReq].name);
 
       ui->curKit = ui->kitReq;
       gtk_combo_box_set_active(ui->kit_combo,ui->curKit);
@@ -273,6 +277,7 @@ static gboolean kit_callback(gpointer data) {
       gtk_widget_hide(ui->no_kit_label);
     } else {
       gtk_widget_show(ui->no_kit_label);
+      gtk_label_set_text(ui->current_kit_label,NO_KIT_STRING);
       gtk_widget_hide(GTK_WIDGET(ui->kit_combo));
     }
   }
@@ -354,16 +359,26 @@ static GtkWidget *create_position_combo(void)
 
 static void build_drmr_ui(DrMrUi* ui) {
   GtkWidget *drmr_ui_widget;
-  GtkWidget *opts_hbox1, *opts_hbox2, 
+  GtkWidget *opts_hbox1, *opts_hbox2,
     *kit_combo_box, *kit_label, *no_kit_label,
     *base_label, *base_spin, *position_label, *position_combo_box;
   GtkCellRenderer *cell_rend;
   GtkAdjustment *base_adj;
   
+  PangoAttrList	*attr_lst;
+  PangoAttribute *attr;
+
   drmr_ui_widget = gtk_vbox_new(false,0);
   g_object_set(drmr_ui_widget,"border-width",6,NULL);
 
   ui->kit_store = gtk_list_store_new(1,G_TYPE_STRING);
+
+  ui->current_kit_label = GTK_LABEL(gtk_label_new(NO_KIT_STRING));
+  attr = pango_attr_weight_new(PANGO_WEIGHT_HEAVY);
+  attr_lst = pango_attr_list_new();
+  pango_attr_list_insert(attr_lst, attr);
+  gtk_label_set_attributes(ui->current_kit_label, attr_lst);
+  pango_attr_list_unref(attr_lst);
 
   opts_hbox1 = gtk_hbox_new(false,0);
   opts_hbox2 = gtk_hbox_new(false,0);
@@ -404,7 +419,8 @@ static void build_drmr_ui(DrMrUi* ui) {
 		     false,false,15);
   gtk_box_pack_start(GTK_BOX(opts_hbox2),position_combo_box,
 		     false,false,0);
-
+  gtk_box_pack_start(GTK_BOX(drmr_ui_widget),GTK_WIDGET(ui->current_kit_label),
+		     false,false,5);
   gtk_box_pack_start(GTK_BOX(drmr_ui_widget),gtk_hseparator_new(),
 		     false,false,5);
   gtk_box_pack_start(GTK_BOX(drmr_ui_widget),opts_hbox1,
