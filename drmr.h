@@ -25,6 +25,7 @@
 #include "lv2/lv2plug.in/ns/ext/atom/util.h"
 #include "lv2/lv2plug.in/ns/lv2core/lv2.h"
 #include "lv2/lv2plug.in/ns/ext/urid/urid.h"
+#include "lv2/lv2plug.in/ns/ext/state/state.h"
 
 // drumkit scanned from a hydrogen xml file
 typedef struct {
@@ -147,6 +148,8 @@ typedef struct {
   LV2_URID kit_path;
   LV2_URID atom_eventTransfer;
   LV2_URID atom_resource;
+  LV2_URID string_urid;
+  LV2_URID get_state;
 } drmr_uris;
 
 typedef struct {
@@ -190,12 +193,18 @@ void map_drmr_uris(LV2_URID_Map *map,
   uris->midi_event =
     map->map(map->handle,
 	     "http://lv2plug.in/ns/ext/midi#MidiEvent");
+  uris->string_urid =
+    map->map(map->handle,
+	     "http://lv2plug.in/ns/ext/atom#String");
   uris->ui_msg =
     map->map(map->handle,
 	     DRMR_URI "#uimsg");
   uris->kit_path =
     map->map(map->handle,
 	     DRMR_URI "#kitpath");
+  uris->kit_path =
+    map->map(map->handle,
+	     DRMR_URI "#getstate");
   uris->atom_eventTransfer = 
     map->map(map->handle, LV2_ATOM__eventTransfer);
   uris->atom_resource = 

@@ -18,6 +18,8 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
+#include <stdlib.h>
 #include <ctype.h>
 #include <sys/types.h>
 #include <dirent.h>
@@ -307,7 +309,7 @@ kits* scan_kits() {
 	  }
 
 	  snprintf(buf,BUFSIZ,"%s/%s/",cur_path,ep->d_name);
-	  kit->path = strdup(buf);
+	  kit->path = realpath(buf,NULL); // realpath will malloc for us
 	  node->skit = kit;
 	  struct kit_list * cur_k = scanned_kits;
 	  if (cur_k) {

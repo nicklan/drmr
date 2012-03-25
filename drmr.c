@@ -159,12 +159,26 @@ connect_port(LV2_Handle instance,
   }
 }
 
-static inline LV2_Atom* build_update_message(DrMr *drmr, const char* kit) {
+static inline LV2_Atom *build_update_message(DrMr *drmr) {
   LV2_Atom_Forge_Frame set_frame;
   LV2_Atom* msg = (LV2_Atom*)lv2_atom_forge_resource
     (&drmr->forge, &set_frame, 1, drmr->uris.ui_msg);
-  lv2_atom_forge_property_head(&drmr->forge, drmr->uris.kit_path,0);
-  lv2_atom_forge_string(&drmr->forge, kit, strlen(kit));
+  if (drmr->current_path) {
+    lv2_atom_forge_property_head(&drmr->forge, drmr->uris.kit_path,0);
+    lv2_atom_forge_string(&drmr->forge, drmr->current_path, strlen(drmr->current_path));
+  }
+  lv2_atom_forge_pop(&drmr->forge,&set_frame);
+  return msg;
+}
+
+static inline LV2_Atom *build_state_message(DrMr *drmr) {
+  LV2_Atom_Forge_Frame set_frame;
+  LV2_Atom* msg = (LV2_Atom*)lv2_atom_forge_resource
+    (&drmr->forge, &set_frame, 1, drmr->uris.get_state);
+  if (drmr->current_path) {
+    lv2_atom_forge_property_head(&drmr->forge, drmr->uris.kit_path,0);
+    lv2_atom_forge_string(&drmr->forge, drmr->current_path, strlen(drmr->current_path));
+  }
   lv2_atom_forge_pop(&drmr->forge,&set_frame);
   return msg;
 }
@@ -257,6 +271,10 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	  drmr->curReq = reqPos;
 	  if (tmp) free(tmp);
 	}
+      } else if (obj->body.otype == drmr->uris.get_state) {
+	lv2_atom_forge_frame_time(&drmr->forge, 0);
+	build_state_message(drmr);
+	printf("Sent state message: %s\n",drmr->current_path);
       }
     }
     else printf("unrecognized event\n");
@@ -272,7 +290,8 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
   if (current_kit_changed) {
     current_kit_changed = 0;
     lv2_atom_forge_frame_time(&drmr->forge, 0);
-    build_update_message(drmr,drmr->current_path);
+    build_update_message(drmr);
+    printf("Sent current path message\n");
   }
 
   lv2_atom_forge_pop(&drmr->forge, &seq_frame);
@@ -330,7 +349,85 @@ static void cleanup(LV2_Handle instance) {
   free(instance);
 }
 
+void save_state(LV2_Handle                 instance,
+		LV2_State_Store_Function   store,
+		void*                      handle,
+		uint32_t                   flags,
+		const LV2_Feature *const * features) {
+  DrMr *drmr = (DrMr*)instance;
+  LV2_State_Map_Path* map_path = NULL;
+  while(*features) {
+    if (!strcmp((*features)->URI, LV2_STATE__mapPath))
+      map_path = (LV2_State_Map_Path*)((*features)->data);
+    features++;
+  }
+
+  if (map_path == NULL) {
+    fprintf(stderr,"Host does not support map_path, cannot save state\n");
+    return;
+  }
+
+  char* mapped_path = map_path->abstract_path(map_path->handle,
+					      drmr->current_path);
+
+  if (store(handle,
+	    drmr->uris.kit_path,
+	    mapped_path,
+	    strlen(mapped_path) + 1,
+	    drmr->uris.string_urid,
+	    LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE)) {
+    printf("Store failed\n");
+  }
+}
+
+void restore_state(LV2_Handle                  instance,
+		   LV2_State_Retrieve_Function retrieve,
+		   void*                       handle,
+		   uint32_t                    flags,
+		   const LV2_Feature *const *  features) {
+  DrMr* drmr = (DrMr*)instance;
+  size_t      size;
+  uint32_t    type;
+  uint32_t    fgs;
+
+  LV2_State_Map_Path* map_path = NULL;
+  while(*features) {
+    if (!strcmp((*features)->URI, LV2_STATE__mapPath))
+      map_path = (LV2_State_Map_Path*)((*features)->data);
+    features++;
+  }
+
+  if (map_path == NULL) {
+    fprintf(stderr,"Host does not support map_path, cannot restore state\n");
+    return;
+  }
+
+
+  const char* abstract_path =
+    retrieve(handle, drmr->uris.kit_path, &size, &type, &fgs);
+
+  if (!abstract_path) {
+    fprintf(stderr,"Found no path in state, not restoring\n");
+    return;
+  }
+
+  char *kit_path = map_path->absolute_path(map_path->handle,abstract_path);
+
+  if (kit_path) { // safe as we're in "Instantiation" threading class
+    int reqPos = (drmr->curReq+1)%REQ_BUF_SIZE;
+    char *tmp = NULL;
+    if (reqPos >= 0 && drmr->request_buf[reqPos])
+      tmp = drmr->request_buf[reqPos];
+    drmr->request_buf[reqPos] = strdup(kit_path);
+    drmr->curReq = reqPos;
+    if (tmp) free(tmp);
+  }
+}
+
+
 static const void* extension_data(const char* uri) {
+  static const LV2_State_Interface state_iface = { save_state, restore_state };
+  if (!strcmp(uri, LV2_STATE_URI "#Interface")) return &state_iface;
   return NULL;
 }
 

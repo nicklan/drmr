@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <limits.h>
 #include <stdlib.h>
 
 #include <gtk/gtk.h>
@@ -295,6 +296,14 @@ static LV2_Atom* build_path_message(DrMrUi *ui, const char* path) {
   return msg;
 }
 
+static LV2_Atom* build_get_state_message(DrMrUi *ui) {
+  LV2_Atom_Forge_Frame set_frame;
+  LV2_Atom* msg = (LV2_Atom*)lv2_atom_forge_resource
+    (&ui->forge, &set_frame, 1, ui->uris.get_state);
+  lv2_atom_forge_pop(&ui->forge,&set_frame);
+  return msg;
+}
+
 static void kit_combobox_changed(GtkComboBox* box, gpointer data) {
   DrMrUi* ui = (DrMrUi*)data;
   gint new_kit = gtk_combo_box_get_active (GTK_COMBO_BOX(box));
@@ -357,6 +366,20 @@ static GtkWidget *create_position_combo(void)
   return combo;
 }
 
+static gulong expose_id;
+static gboolean expose_callback (GtkWidget *widget, GdkEventExpose *event, gpointer data) {
+  DrMrUi* ui = (DrMrUi*)data;
+  uint8_t msg_buf[1024];
+  lv2_atom_forge_set_buffer(&ui->forge, msg_buf, 1024);
+  LV2_Atom *msg = build_get_state_message(ui);
+  ui->write(ui->controller,DRMR_CONTROL,
+	    lv2_atom_total_size(msg),
+	    ui->uris.atom_eventTransfer,
+	    msg);
+  g_signal_handler_disconnect(widget,expose_id);
+  return FALSE;
+}
+
 static void build_drmr_ui(DrMrUi* ui) {
   GtkWidget *drmr_ui_widget;
   GtkWidget *opts_hbox1, *opts_hbox2,
@@ -369,6 +392,7 @@ static void build_drmr_ui(DrMrUi* ui) {
   PangoAttribute *attr;
 
   drmr_ui_widget = gtk_vbox_new(false,0);
+  expose_id = g_signal_connect (drmr_ui_widget, "expose-event", G_CALLBACK (expose_callback), ui);
   g_object_set(drmr_ui_widget,"border-width",6,NULL);
 
   ui->kit_store = gtk_list_store_new(1,G_TYPE_STRING);
@@ -503,7 +527,6 @@ instantiate(const LV2UI_Descriptor*   descriptor,
   ui->startSamp = 0;
 #endif
 
-
   *widget = ui->drmr_widget;
 
   return ui;
@@ -548,20 +571,33 @@ port_event(LV2UI_Handle handle,
       LV2_Atom* atom = (LV2_Atom*)buffer;
       if (atom->type == ui->uris.atom_resource) {
 	LV2_Atom_Object* obj = (LV2_Atom_Object*)atom;
+	if (obj->body.otype != ui->uris.get_state &&
+	    obj->body.otype != ui->uris.ui_msg) {
+	  // both state and ui_msg are the same at the moment
+	  fprintf(stderr,"Invalid message type to ui\n");
+	  return;
+	}
 	const LV2_Atom* path = NULL;
 	lv2_object_get(obj, ui->uris.kit_path, &path, 0);
 	if (!path)
 	  fprintf(stderr,"Got UI message without kit_path, ignoring\n");
 	else {
 	  char *kitpath = LV2_ATOM_BODY(path);
+	  char *realp = realpath(kitpath,NULL);
+	  if (!realp) {
+	    fprintf(stderr,"Passed a path I can't resolve, bailing out\n");
+	    return;
+	  }
 	  int i;
 	  for(i = 0;i < ui->kits->num_kits;i++)
-	    if (!strcmp(ui->kits->kits[i].path,kitpath))
+	    if (!strcmp(ui->kits->kits[i].path,realp))
 	      break;
 	  if (i < ui->kits->num_kits) {
 	    ui->kitReq = i;
 	    g_idle_add(kit_callback,ui);
-	  }
+	  } else
+	    fprintf(stderr,"Couldn't find kit %s\n",realp);
+	  free(realp);
 	}
       } else
 	fprintf(stderr, "Unknown message type.\n");
