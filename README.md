@@ -6,7 +6,6 @@ DrMr is an LV2 sampler plugin.  It's main reason to exist is to give a way for l
 - Control via midi
 - Scan for and load hydrogen drum kits (see note 3)
 - Multi-layer hydrogen kits (will pick layer based on that samples set gain)
-- Kit is set via an LV2 control (see note 1 below)
 - LV2 controls for gain on first 32 samples of kit (see note 2 below)
 - LV2 controls for pan on first 32 samples of kit (see note 2 below)
 - GTK ui that can select a kit and control gain/pan on each sample
@@ -19,6 +18,28 @@ Hopefully coming soon:
 
 
 DrMr is a new project, so the code should be considered alpha.  Bug reports are much appreciated.
+
+Regarding This Branch
+---------------------
+
+This (lv2unstable) branch of DrMr uses the lv2-atom and lv2-state extensions, which are both experimental lv2 extensions.  As such, you'll need to have the svn version of lv2 installed (see [here](http://lv2plug.in/trac/wiki/SVN_repository) for info about how to install lv2 from svn).  You'll also need a host that supports these extensions.  Known working hosts are [jalv](http://drobilla.net/software/jalv/) and [ardour3](http://ardour.org/download_full), both from svn (i.e. Ardour3-beta3 won't work).  Using these new extensions allows DrMr to have a number of new and planned features.
+
+The intention is to have this version become the main stable version as the lv2 spec stabilizes and more hosts support the required extensions.
+
+New features include:
+
+- Kits are now selected via their path and not the hacky integer port as before
+- The kit path is now saved and restored using lv2-state, so you can install/remove/modify hydrogen kits and your state won't be messed up.
+- No need to scan kits in the plugin core so the plugin loads faster
+
+Coming soon features:
+
+- Visual indication in the UI when a sample is triggered
+- Loading of individual samples into each slot (so you can tweak the kit to use your own samples).  New sample locations will also be saved using lv2-state so modifications will be persistent.
+- New kit creation and saving (a bit further down the road)
+
+
+One thing to note is that the kit index port has been removed.  This means if you have projects using the master branch version of plugin you should note the kit externally as that state will not be reloaded.
 
 Download
 --------
