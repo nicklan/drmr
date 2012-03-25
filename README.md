@@ -20,6 +20,12 @@ Hopefully coming soon:
 
 DrMr is a new project, so the code should be considered alpha.  Bug reports are much appreciated.
 
+The lv2unstable Branch
+----------------------
+There is a branch of DrMr that has a number of new features, the most useful being that the kit loaded can be saved properly as a path, and so the issue described in note 1 below is no longer an issue.  You can click the branch button near the top of the page and select lv2unstable to see more information.
+
+The lv2unstable requires some new lv2 features not available outside the lv2-svn version at the moment, so it's living in its own branch, but it will be merged as the main branch when the required features stabilize.
+
 Download
 --------
 Only via git for now, just check out this repo
