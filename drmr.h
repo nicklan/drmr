@@ -201,7 +201,7 @@ void map_drmr_uris(LV2_URID_Map *map,
   uris->kit_path =
     map->map(map->handle,
 	     DRMR_URI "#kitpath");
-  uris->kit_path =
+  uris->get_state =
     map->map(map->handle,
 	     DRMR_URI "#getstate");
   uris->atom_eventTransfer = 
