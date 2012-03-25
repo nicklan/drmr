@@ -274,7 +274,6 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
       } else if (obj->body.otype == drmr->uris.get_state) {
 	lv2_atom_forge_frame_time(&drmr->forge, 0);
 	build_state_message(drmr);
-	printf("Sent state message: %s\n",drmr->current_path);
       }
     }
     else printf("unrecognized event\n");
@@ -291,7 +290,6 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
     current_kit_changed = 0;
     lv2_atom_forge_frame_time(&drmr->forge, 0);
     build_update_message(drmr);
-    printf("Sent current path message\n");
   }
 
   lv2_atom_forge_pop(&drmr->forge, &seq_frame);
@@ -376,7 +374,7 @@ void save_state(LV2_Handle                 instance,
 	    strlen(mapped_path) + 1,
 	    drmr->uris.string_urid,
 	    LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE)) {
-    printf("Store failed\n");
+    fprintf(stderr,"Store failed\n");
   }
 }
 
