@@ -21,7 +21,7 @@
   ui:ui <http://github.com/nicklan/drmr#ui> ;
   lv2:extensionData <http://lv2plug.in/ns/ext/state#Interface> ;
   lv2:port [
-    a lv2:InputPort , atom:MessagePort;
+    a lv2:InputPort , atom:AtomPort;
     atom:bufferType atom:Sequence ;
     atom:supports <http://lv2plug.in/ns/ext/midi#MidiEvent> ,
                   <http://lv2plug.in/ns/ext/atom#Resource> ;
@@ -30,7 +30,7 @@
     lv2:name "Control";
   ],
   [
-    a lv2:OutputPort , atom:MessagePort ;
+    a lv2:OutputPort , atom:AtomPort ;
     atom:bufferType atom:Sequence ;
     atom:supports <http://lv2plug.in/ns/ext/atom#Resource> ;
     lv2:index 69 ;
