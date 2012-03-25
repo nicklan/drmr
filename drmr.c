@@ -139,9 +139,6 @@ connect_port(LV2_Handle instance,
   case DRMR_RIGHT:
     drmr->right = (float*)data;
     break;
-  case DRMR_KITNUM:
-    //if(data) drmr->kitReq = (float*)data;
-    break;
   case DRMR_BASENOTE:
     if (data) drmr->baseNote = (float*)data;
   default:
