@@ -18,6 +18,7 @@
 #include <stdlib.h>
 
 #include <gtk/gtk.h>
+#include <gdk/gdk.h>
 
 #include "drmr.h"
 #include "drmr_hydrogen.h"
@@ -48,6 +49,7 @@ typedef struct {
   GtkSpinButton *base_spin;
   GtkLabel *base_label;
   GtkListStore *kit_store;
+  GtkWidget** sample_frames;
   GtkWidget** gain_sliders;
   GtkWidget** pan_sliders;
   float *gain_vals,*pan_vals;
@@ -60,6 +62,7 @@ typedef struct {
   gboolean forceUpdate;
 
   int samples;
+  int baseNote;
 
   GQuark gain_quark, pan_quark;
 
@@ -86,7 +89,7 @@ static gboolean pan_callback(GtkRange* range, GtkScrollType type, gdouble value,
   return FALSE;
 }
 
-static void fill_sample_table(DrMrUi* ui, int samples, char** names,GtkWidget** gain_sliders, GtkWidget** pan_sliders) {
+static void fill_sample_table(DrMrUi* ui, int samples, char** names, GtkWidget** sample_frames, GtkWidget** gain_sliders, GtkWidget** pan_sliders) {
   int row = 0;
   int col = 0;
   int si;
@@ -120,6 +123,8 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names,GtkWidget** 
     frame = gtk_frame_new(buf);
     gtk_label_set_use_markup(GTK_LABEL(gtk_frame_get_label_widget(GTK_FRAME(frame))),true);
     gtk_frame_set_shadow_type(GTK_FRAME(frame),GTK_SHADOW_OUT);
+    if (sample_frames) sample_frames[si] = frame;
+
     hbox = gtk_hbox_new(false,0);
 
 #ifdef NO_NKNOB
@@ -202,6 +207,18 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names,GtkWidget** 
   gtk_widget_queue_resize(GTK_WIDGET(ui->sample_table));
 }
 
+static gboolean unset_bg(gpointer data) {
+  gtk_widget_modify_bg(GTK_WIDGET(data),GTK_STATE_NORMAL,NULL);
+  return FALSE;
+}
+
+static void sample_triggered(DrMrUi *ui, int si) {
+  GdkColor blk;
+  gdk_color_black(gdk_colormap_get_system(),&blk);
+  gtk_widget_modify_bg(ui->sample_frames[si],GTK_STATE_NORMAL,&blk);
+  g_timeout_add(100,unset_bg,ui->sample_frames[si]);
+}
+
 static const char* nstrs = "C C#D D#E F F#G G#A A#B ";
 static char baseLabelBuf[32];
 static void setBaseLabel(int noteIdx) {
@@ -219,6 +236,7 @@ static void base_changed(GtkSpinButton *base_spin, gpointer data) {
     setBaseLabel((int)base);
     ui->write(ui->controller,DRMR_BASENOTE,4,0,&base);
     gtk_label_set_markup(ui->base_label,baseLabelBuf);
+    ui->baseNote = (int)base;
   }
   else
     fprintf(stderr,"Base spin got out of range: %f\n",base);
@@ -242,13 +260,17 @@ static gboolean kit_callback(gpointer data) {
     int samples = (ui->kitReq<ui->kits->num_kits && ui->kitReq >= 0)?
       ui->kits->kits[ui->kitReq].samples:
       0;
+    GtkWidget** sample_frames;
     GtkWidget** gain_sliders;
     GtkWidget** pan_sliders;
     if (ui->sample_table) {
+      sample_frames = ui->sample_frames;
       gain_sliders = ui->gain_sliders;
       pan_sliders = ui->pan_sliders;
+      ui->sample_frames = NULL;
       ui->gain_sliders = NULL;
       ui->pan_sliders = NULL;
+      if (sample_frames) free(sample_frames);
       if (gain_sliders) free(gain_sliders);
       if (pan_sliders) free(pan_sliders);
       gtk_widget_destroy(GTK_WIDGET(ui->sample_table));
@@ -259,14 +281,16 @@ static gboolean kit_callback(gpointer data) {
       gtk_table_set_col_spacings(ui->sample_table,5);
       gtk_table_set_row_spacings(ui->sample_table,5);
 
+      sample_frames = malloc(samples*sizeof(GtkWidget*));
       gain_sliders = malloc(samples*sizeof(GtkWidget*));
       pan_sliders = malloc(samples*sizeof(GtkWidget*));
-      fill_sample_table(ui,samples,ui->kits->kits[ui->kitReq].sample_names,gain_sliders,pan_sliders);
+      fill_sample_table(ui,samples,ui->kits->kits[ui->kitReq].sample_names,sample_frames,gain_sliders,pan_sliders);
       gtk_box_pack_start(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),
 			 true,true,5);
       gtk_box_reorder_child(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),1);
       gtk_widget_show_all(GTK_WIDGET(ui->sample_table));
       ui->samples = samples;
+      ui->sample_frames = sample_frames;
       ui->gain_sliders = gain_sliders;
       ui->pan_sliders = pan_sliders;
 
@@ -539,6 +563,7 @@ static void cleanup(LV2UI_Handle handle) {
   // before calling, avoid double-destroy
   if (GTK_IS_WIDGET(ui->drmr_widget))
     gtk_widget_destroy(ui->drmr_widget);
+  if (ui->sample_frames) free(ui->sample_frames);
   if (ui->gain_sliders) free(ui->gain_sliders);
   if (ui->pan_sliders) free(ui->pan_sliders);
   g_free(ui->bundle_path);
@@ -571,36 +596,47 @@ port_event(LV2UI_Handle handle,
       LV2_Atom* atom = (LV2_Atom*)buffer;
       if (atom->type == ui->uris.atom_resource) {
 	LV2_Atom_Object* obj = (LV2_Atom_Object*)atom;
-	if (obj->body.otype != ui->uris.get_state &&
-	    obj->body.otype != ui->uris.ui_msg) {
+	if (obj->body.otype == ui->uris.get_state ||
+	    obj->body.otype == ui->uris.ui_msg) {
 	  // both state and ui_msg are the same at the moment
-	  fprintf(stderr,"Invalid message type to ui\n");
-	  return;
-	}
-	const LV2_Atom* path = NULL;
-	lv2_object_get(obj, ui->uris.kit_path, &path, 0);
-	if (!path)
-	  fprintf(stderr,"Got UI message without kit_path, ignoring\n");
-	else {
-	  char *kitpath = LV2_ATOM_BODY(path);
-	  char *realp = realpath(kitpath,NULL);
-	  if (!realp) {
-	    fprintf(stderr,"Passed a path I can't resolve, bailing out\n");
+	  const LV2_Atom* path = NULL;
+	  lv2_object_get(obj, ui->uris.kit_path, &path, 0);
+	  if (!path)
+	    fprintf(stderr,"Got UI message without kit_path, ignoring\n");
+	  else {
+	    char *kitpath = LV2_ATOM_BODY(path);
+	    char *realp = realpath(kitpath,NULL);
+	    if (!realp) {
+	      fprintf(stderr,"Passed a path I can't resolve, bailing out\n");
+	      return;
+	    }
+	    int i;
+	    for(i = 0;i < ui->kits->num_kits;i++)
+	      if (!strcmp(ui->kits->kits[i].path,realp))
+		break;
+	    if (i < ui->kits->num_kits) {
+	      ui->kitReq = i;
+	      g_idle_add(kit_callback,ui);
+	    } else
+	      fprintf(stderr,"Couldn't find kit %s\n",realp);
+	    free(realp);
+	  }
+	} 
+	else if (obj->body.otype == ui->uris.midi_info) {
+	  const LV2_Atom *midi_atom = NULL;
+	  lv2_object_get(obj, ui->uris.midi_event, &midi_atom, 0);
+	  if(!midi_atom) {
+	    fprintf(stderr,"Midi info with no midi data\n");
 	    return;
 	  }
-	  int i;
-	  for(i = 0;i < ui->kits->num_kits;i++)
-	    if (!strcmp(ui->kits->kits[i].path,realp))
-	      break;
-	  if (i < ui->kits->num_kits) {
-	    ui->kitReq = i;
-	    g_idle_add(kit_callback,ui);
-	  } else
-	    fprintf(stderr,"Couldn't find kit %s\n",realp);
-	  free(realp);
+	  const uint8_t *data = (const uint8_t*)midi_atom;
+	  uint8_t nn = data[1] - ui->baseNote;
+	  sample_triggered(ui,nn);
 	}
+	else
+	  fprintf(stderr, "Unknown resource type passed to ui.\n");
       } else
-	fprintf(stderr, "Unknown message type.\n");
+	fprintf(stderr, "Non resource message passed to ui.\n");
     } else
       fprintf(stderr, "Unknown format.\n");
   }
@@ -610,6 +646,7 @@ port_event(LV2UI_Handle handle,
       setBaseLabel((int)base);
       gtk_spin_button_set_value(ui->base_spin,base);
       gtk_label_set_markup(ui->base_label,baseLabelBuf);
+      ui->baseNote = base;
     }
   }
   else if (index >= DRMR_GAIN_ONE &&

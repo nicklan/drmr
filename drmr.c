@@ -180,6 +180,16 @@ static inline LV2_Atom *build_state_message(DrMr *drmr) {
   return msg;
 }
 
+static inline LV2_Atom *build_midi_info_message(DrMr *drmr, uint8_t *data) {
+  LV2_Atom_Forge_Frame set_frame;
+  LV2_Atom* msg = (LV2_Atom*)lv2_atom_forge_resource
+    (&drmr->forge, &set_frame, 1, drmr->uris.midi_info);
+  lv2_atom_forge_property_head(&drmr->forge, drmr->uris.midi_event,0);
+  lv2_atom_forge_write(&drmr->forge, data, 3);
+  lv2_atom_forge_pop(&drmr->forge,&set_frame);
+  return msg;
+}
+
 static inline void layer_to_sample(drmr_sample *sample, float gain) {
   int i;
   float mapped_gain = (1-(gain/GAIN_MIN));
@@ -241,6 +251,8 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	    if (drmr->samples[nn].limit == 0)
 	      fprintf(stderr,"Failed to find layer at: %i for %f\n",nn,*drmr->gains[nn]);
 	  }
+	  lv2_atom_forge_frame_time(&drmr->forge, 0);
+	  build_midi_info_message(drmr,data);
 	  drmr->samples[nn].active = 1;
 	  drmr->samples[nn].offset = 0;
 	}
