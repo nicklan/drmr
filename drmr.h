@@ -150,6 +150,7 @@ typedef struct {
   LV2_URID string_urid;
   LV2_URID get_state;
   LV2_URID midi_info;
+  LV2_URID sample_trigger;
 } drmr_uris;
 
 typedef struct {
@@ -208,6 +209,9 @@ void map_drmr_uris(LV2_URID_Map *map,
   uris->midi_info =
     map->map(map->handle,
 	     DRMR_URI "#midiinfo");
+  uris->sample_trigger =
+    map->map(map->handle,
+	     DRMR_URI "#sampletrigger");
   uris->atom_eventTransfer = 
     map->map(map->handle, LV2_ATOM__eventTransfer);
   uris->atom_resource = 

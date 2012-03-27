@@ -65,7 +65,7 @@ typedef struct {
   int samples;
   int baseNote;
 
-  GQuark gain_quark, pan_quark;
+  GQuark gain_quark, pan_quark, trigger_quark;
 
   int curKit;
   int kitReq;
@@ -89,6 +89,24 @@ static gboolean pan_callback(GtkRange* range, GtkScrollType type, gdouble value,
   float pan = (float)value;
   ui->pan_vals[pidx] = pan;
   ui->write(ui->controller,pidx+DRMR_PAN_ONE,4,0,&pan);
+  return FALSE;
+}
+
+static gboolean trigger_led_clicked(GtkWidget *widget, GdkEvent  *event, gpointer data) {
+  LV2_Atom_Forge_Frame set_frame;
+  DrMrUi* ui = (DrMrUi*)data;
+  int32_t tidx = GPOINTER_TO_INT(g_object_get_qdata(G_OBJECT(widget),ui->trigger_quark));
+  uint8_t msg_buf[1024];
+  lv2_atom_forge_set_buffer(&ui->forge, msg_buf, 1024);
+  LV2_Atom *msg = (LV2_Atom*)lv2_atom_forge_resource
+    (&ui->forge, &set_frame, 1, ui->uris.ui_msg);
+  lv2_atom_forge_property_head(&ui->forge, ui->uris.sample_trigger,0);
+  lv2_atom_forge_int(&ui->forge, tidx);
+  lv2_atom_forge_pop(&ui->forge,&set_frame);
+  ui->write(ui->controller,DRMR_CONTROL,
+	    lv2_atom_total_size(msg),
+	    ui->uris.atom_eventTransfer,
+	    msg);
   return FALSE;
 }
 
@@ -116,7 +134,7 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names, GtkWidget**
 
   for(si = 0;si<samples;si++) {
     GtkWidget *frame,*vbox,*hbox,*gain_vbox,*pan_vbox;
-    GtkWidget *button_box, *led;
+    GtkWidget *button_box, *led_event_box, *led;
     GtkWidget* gain_slider;
     GtkWidget* pan_slider;
     GtkWidget* gain_label;
@@ -188,10 +206,15 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names, GtkWidget**
 
     button_box = gtk_hbox_new(false,2);
 
+    led_event_box = gtk_event_box_new();
+    g_object_set_qdata(G_OBJECT(led_event_box),ui->trigger_quark,GINT_TO_POINTER(si));
+    g_signal_connect(G_OBJECT(led_event_box),"button-release-event",
+		     G_CALLBACK(trigger_led_clicked),ui);
     led = gtk_image_new_from_pixbuf(led_off_pixbuf);
     if (notify_leds) notify_leds[si] = led;
+    gtk_container_add(GTK_CONTAINER(led_event_box),led);
 
-    gtk_box_pack_start(GTK_BOX(button_box),led,false,false,0);
+    gtk_box_pack_start(GTK_BOX(button_box),led_event_box,false,false,0);
     gtk_box_pack_start(GTK_BOX(button_box),gtk_label_new(""),true,true,0);
 
 
@@ -576,6 +599,7 @@ instantiate(const LV2UI_Descriptor*   descriptor,
   ui->kits = scan_kits();
   ui->gain_quark = g_quark_from_string("drmr_gain_quark");
   ui->pan_quark = g_quark_from_string("drmr_pan_quark");
+  ui->trigger_quark = g_quark_from_string("drmr_trigger_quark");
   ui->gain_sliders = NULL;
   ui->pan_sliders = NULL;
 

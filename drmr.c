@@ -212,6 +212,26 @@ static inline void layer_to_sample(drmr_sample *sample, float gain) {
   sample->data = sample->layers[0].data;
 }
 
+static inline void trigger_sample(DrMr *drmr, int nn, uint8_t* const data) {
+  // need to mutex this to avoid getting the samples array
+  // changed after the check that the midi-note is valid
+  pthread_mutex_lock(&drmr->load_mutex);
+  if (nn >= 0 && nn < drmr->num_samples) {
+    if (drmr->samples[nn].layer_count > 0) {
+      layer_to_sample(drmr->samples+nn,*(drmr->gains[nn]));
+      if (drmr->samples[nn].limit == 0)
+	fprintf(stderr,"Failed to find layer at: %i for %f\n",nn,*drmr->gains[nn]);
+    }
+    if (data) {
+      lv2_atom_forge_frame_time(&drmr->forge, 0);
+      build_midi_info_message(drmr,data);
+    }
+    drmr->samples[nn].active = 1;
+    drmr->samples[nn].offset = 0;
+  }
+  pthread_mutex_unlock(&drmr->load_mutex);
+}
+
 #define DB3SCALE -0.8317830986718104f
 #define DB3SCALEPO 1.8317830986718104f
 // taken from lv2 example amp plugin
@@ -242,21 +262,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
       case 9: {
 	uint8_t nn = data[1];
 	nn-=baseNote;
-	// need to mutex this to avoid getting the samples array
-	// changed after the check that the midi-note is valid
-	pthread_mutex_lock(&drmr->load_mutex); 
-	if (nn >= 0 && nn < drmr->num_samples) {
-	  if (drmr->samples[nn].layer_count > 0) {
-	    layer_to_sample(drmr->samples+nn,*(drmr->gains[nn]));
-	    if (drmr->samples[nn].limit == 0)
-	      fprintf(stderr,"Failed to find layer at: %i for %f\n",nn,*drmr->gains[nn]);
-	  }
-	  lv2_atom_forge_frame_time(&drmr->forge, 0);
-	  build_midi_info_message(drmr,data);
-	  drmr->samples[nn].active = 1;
-	  drmr->samples[nn].offset = 0;
-	}
-	pthread_mutex_unlock(&drmr->load_mutex);
+	trigger_sample(drmr,nn,data);
 	break;
       }
       default:
@@ -267,10 +273,9 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
       const LV2_Atom_Object *obj = (LV2_Atom_Object*)&ev->body;
       if (obj->body.otype == drmr->uris.ui_msg) {
 	const LV2_Atom* path = NULL;
-	lv2_object_get(obj, drmr->uris.kit_path, &path, 0);
-	if (!path) 
-	  fprintf(stderr,"Got UI message without kit_path, ignoring\n");
-	else {
+	const LV2_Atom* trigger = NULL;
+	lv2_object_get(obj, drmr->uris.kit_path, &path, drmr->uris.sample_trigger, &trigger, 0);
+	if (path) {
 	  int reqPos = (drmr->curReq+1)%REQ_BUF_SIZE;
 	  char *tmp = NULL;
 	  if (reqPos >= 0 &&
@@ -279,6 +284,14 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	  drmr->request_buf[reqPos] = strdup(LV2_ATOM_BODY(path));
 	  drmr->curReq = reqPos;
 	  if (tmp) free(tmp);
+	}
+	if (trigger) {
+	  int32_t si = ((const LV2_Atom_Int*)trigger)->body;
+	  uint8_t mdata[3];
+	  mdata[0] = 0x90; // note on
+	  mdata[1] = si+baseNote;
+	  mdata[2] = 0x7f;
+	  trigger_sample(drmr,si,mdata);
 	}
       } else if (obj->body.otype == drmr->uris.get_state) {
 	lv2_atom_forge_frame_time(&drmr->forge, 0);
