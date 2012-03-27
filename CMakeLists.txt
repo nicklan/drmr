@@ -108,6 +108,6 @@ install(TARGETS drmr drmr_ui
   DESTINATION ${CMAKE_INSTALL_PREFIX}/${LV2_INSTALL_DIR}/drmr.lv2
 )
 
-install (FILES manifest.ttl drmr.ttl knob.png
+install (FILES manifest.ttl drmr.ttl knob.png led_on.png led_off.png
   DESTINATION ${CMAKE_INSTALL_PREFIX}/${LV2_INSTALL_DIR}/drmr.lv2
 )

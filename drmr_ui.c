@@ -49,10 +49,11 @@ typedef struct {
   GtkSpinButton *base_spin;
   GtkLabel *base_label;
   GtkListStore *kit_store;
-  GtkWidget** sample_frames;
   GtkWidget** gain_sliders;
   GtkWidget** pan_sliders;
   float *gain_vals,*pan_vals;
+
+  GtkWidget** notify_leds;
 
   gchar *bundle_path;
 
@@ -70,6 +71,8 @@ typedef struct {
   int kitReq;
   kits* kits;
 } DrMrUi;
+
+static GdkPixbuf *led_on_pixbuf=NULL,*led_off_pixbuf=NULL;
 
 static gboolean gain_callback(GtkRange* range, GtkScrollType type, gdouble value, gpointer data) {
   DrMrUi* ui = (DrMrUi*)data;
@@ -89,7 +92,7 @@ static gboolean pan_callback(GtkRange* range, GtkScrollType type, gdouble value,
   return FALSE;
 }
 
-static void fill_sample_table(DrMrUi* ui, int samples, char** names, GtkWidget** sample_frames, GtkWidget** gain_sliders, GtkWidget** pan_sliders) {
+static void fill_sample_table(DrMrUi* ui, int samples, char** names, GtkWidget** notify_leds, GtkWidget** gain_sliders, GtkWidget** pan_sliders) {
   int row = 0;
   int col = 0;
   int si;
@@ -112,19 +115,21 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names, GtkWidget**
   }
 
   for(si = 0;si<samples;si++) {
-    GtkWidget *frame,*hbox,*gain_vbox,*pan_vbox;
+    GtkWidget *frame,*vbox,*hbox,*gain_vbox,*pan_vbox;
+    GtkWidget *button_box, *led;
     GtkWidget* gain_slider;
     GtkWidget* pan_slider;
     GtkWidget* gain_label;
     GtkWidget* pan_label;
     gboolean slide_expand;
+
     snprintf(buf,64,"<b>%s</b> (%i)",names[si],si);
 
     frame = gtk_frame_new(buf);
     gtk_label_set_use_markup(GTK_LABEL(gtk_frame_get_label_widget(GTK_FRAME(frame))),true);
     gtk_frame_set_shadow_type(GTK_FRAME(frame),GTK_SHADOW_OUT);
-    if (sample_frames) sample_frames[si] = frame;
 
+    vbox = gtk_vbox_new(false,5);
     hbox = gtk_hbox_new(false,0);
 
 #ifdef NO_NKNOB
@@ -179,7 +184,20 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names, GtkWidget**
     gtk_box_pack_start(GTK_BOX(hbox),gain_vbox,true,true,0);
     gtk_box_pack_start(GTK_BOX(hbox),pan_vbox,true,true,0);
 
-    gtk_container_add(GTK_CONTAINER(frame),hbox);
+    gtk_box_pack_start(GTK_BOX(vbox),hbox,true,true,0);
+
+    button_box = gtk_hbox_new(false,2);
+
+    led = gtk_image_new_from_pixbuf(led_off_pixbuf);
+    if (notify_leds) notify_leds[si] = led;
+
+    gtk_box_pack_start(GTK_BOX(button_box),led,false,false,0);
+    gtk_box_pack_start(GTK_BOX(button_box),gtk_label_new(""),true,true,0);
+
+
+    gtk_box_pack_start(GTK_BOX(vbox),button_box,false,false,0);
+    g_object_set(vbox,"border-width",5,NULL);
+    gtk_container_add(GTK_CONTAINER(frame),vbox);
 
     gtk_table_attach_defaults(ui->sample_table,frame,col,col+1,row,row+1);
 
@@ -208,15 +226,14 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names, GtkWidget**
 }
 
 static gboolean unset_bg(gpointer data) {
-  gtk_widget_modify_bg(GTK_WIDGET(data),GTK_STATE_NORMAL,NULL);
+  if (GTK_IS_IMAGE(data))
+    gtk_image_set_from_pixbuf(GTK_IMAGE(data),led_off_pixbuf);
   return FALSE;
 }
 
 static void sample_triggered(DrMrUi *ui, int si) {
-  GdkColor blk;
-  gdk_color_black(gdk_colormap_get_system(),&blk);
-  gtk_widget_modify_bg(ui->sample_frames[si],GTK_STATE_NORMAL,&blk);
-  g_timeout_add(100,unset_bg,ui->sample_frames[si]);
+  gtk_image_set_from_pixbuf(GTK_IMAGE(ui->notify_leds[si]),led_on_pixbuf);
+  g_timeout_add(200,unset_bg,ui->notify_leds[si]);
 }
 
 static const char* nstrs = "C C#D D#E F F#G G#A A#B ";
@@ -260,17 +277,17 @@ static gboolean kit_callback(gpointer data) {
     int samples = (ui->kitReq<ui->kits->num_kits && ui->kitReq >= 0)?
       ui->kits->kits[ui->kitReq].samples:
       0;
-    GtkWidget** sample_frames;
+    GtkWidget** notify_leds;
     GtkWidget** gain_sliders;
     GtkWidget** pan_sliders;
     if (ui->sample_table) {
-      sample_frames = ui->sample_frames;
+      notify_leds = ui->notify_leds;
       gain_sliders = ui->gain_sliders;
       pan_sliders = ui->pan_sliders;
-      ui->sample_frames = NULL;
+      ui->notify_leds = NULL;
       ui->gain_sliders = NULL;
       ui->pan_sliders = NULL;
-      if (sample_frames) free(sample_frames);
+      if (notify_leds) free(notify_leds);
       if (gain_sliders) free(gain_sliders);
       if (pan_sliders) free(pan_sliders);
       gtk_widget_destroy(GTK_WIDGET(ui->sample_table));
@@ -281,16 +298,16 @@ static gboolean kit_callback(gpointer data) {
       gtk_table_set_col_spacings(ui->sample_table,5);
       gtk_table_set_row_spacings(ui->sample_table,5);
 
-      sample_frames = malloc(samples*sizeof(GtkWidget*));
+      notify_leds = malloc(samples*sizeof(GtkWidget*));
       gain_sliders = malloc(samples*sizeof(GtkWidget*));
       pan_sliders = malloc(samples*sizeof(GtkWidget*));
-      fill_sample_table(ui,samples,ui->kits->kits[ui->kitReq].sample_names,sample_frames,gain_sliders,pan_sliders);
+      fill_sample_table(ui,samples,ui->kits->kits[ui->kitReq].sample_names,notify_leds,gain_sliders,pan_sliders);
       gtk_box_pack_start(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),
 			 true,true,5);
       gtk_box_reorder_child(GTK_BOX(ui->drmr_widget),GTK_WIDGET(ui->sample_table),1);
       gtk_widget_show_all(GTK_WIDGET(ui->sample_table));
       ui->samples = samples;
-      ui->sample_frames = sample_frames;
+      ui->notify_leds = notify_leds;
       ui->gain_sliders = gain_sliders;
       ui->pan_sliders = pan_sliders;
 
@@ -404,6 +421,30 @@ static gboolean expose_callback (GtkWidget *widget, GdkEventExpose *event, gpoin
   return FALSE;
 }
 
+static void load_led_pixbufs(DrMrUi* ui) {
+  GError *error = NULL;
+  gchar *pixbuf_path;
+
+  pixbuf_path = g_build_path(G_DIR_SEPARATOR_S,ui->bundle_path,"led_on.png",NULL);
+  if (pixbuf_path) {
+    led_on_pixbuf = gdk_pixbuf_new_from_file(pixbuf_path,&error);
+    if (!led_on_pixbuf)
+      fprintf(stderr,"Could not load led_on pixbuf: %s\n",error->message);
+    g_free(pixbuf_path);
+  } else
+    fprintf(stderr,"Could not build path to load led_on pixbuf");
+
+
+  pixbuf_path = g_build_path(G_DIR_SEPARATOR_S,ui->bundle_path,"led_off.png",NULL);
+  if (pixbuf_path) {
+    led_off_pixbuf = gdk_pixbuf_new_from_file(pixbuf_path,&error);
+    if (!led_off_pixbuf)
+      fprintf(stderr,"Could not load led_off pixbuf: %s\n",error->message);
+    g_free(pixbuf_path);
+  } else
+    fprintf(stderr,"Could not build path to load led_off pixbuf");
+}
+
 static void build_drmr_ui(DrMrUi* ui) {
   GtkWidget *drmr_ui_widget;
   GtkWidget *opts_hbox1, *opts_hbox2,
@@ -501,7 +542,7 @@ instantiate(const LV2UI_Descriptor*   descriptor,
             LV2UI_Controller          controller,
             LV2UI_Widget*             widget,
             const LV2_Feature* const* features) {
-  DrMrUi     *ui = (DrMrUi*)malloc(sizeof(DrMrUi));
+  DrMrUi *ui = (DrMrUi*)malloc(sizeof(DrMrUi));
 
   ui->write      = write_function;
   ui->controller = controller;
@@ -524,6 +565,9 @@ instantiate(const LV2UI_Descriptor*   descriptor,
   map_drmr_uris(ui->map,&(ui->uris));
 
   ui->bundle_path = g_strdup(bundle_path);
+
+  load_led_pixbufs(ui);
+
 
   lv2_atom_forge_init(&ui->forge,ui->map);
 
@@ -563,10 +607,12 @@ static void cleanup(LV2UI_Handle handle) {
   // before calling, avoid double-destroy
   if (GTK_IS_WIDGET(ui->drmr_widget))
     gtk_widget_destroy(ui->drmr_widget);
-  if (ui->sample_frames) free(ui->sample_frames);
+  if (ui->notify_leds) free(ui->notify_leds);
   if (ui->gain_sliders) free(ui->gain_sliders);
   if (ui->pan_sliders) free(ui->pan_sliders);
   g_free(ui->bundle_path);
+  if (led_on_pixbuf) g_object_unref(led_on_pixbuf);
+  if (led_off_pixbuf) g_object_unref(led_off_pixbuf);
   free_kits(ui->kits);
   free(ui);
 }
