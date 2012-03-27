@@ -31,10 +31,11 @@ New features include:
 - Kits are now selected via their path and not the hacky integer port as before
 - The kit path is now saved and restored using lv2-state, so you can install/remove/modify hydrogen kits and your state won't be messed up.
 - No need to scan kits in the plugin core so the plugin loads faster
+- Led indicator in the UI when a sample is triggered
+- Led indicator can be clicked to trigger sample for preview
 
 Coming soon features:
 
-- Visual indication in the UI when a sample is triggered
 - Loading of individual samples into each slot (so you can tweak the kit to use your own samples).  New sample locations will also be saved using lv2-state so modifications will be persistent.
 - New kit creation and saving (a bit further down the road)
 
