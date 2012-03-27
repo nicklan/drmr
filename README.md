@@ -10,6 +10,7 @@ DrMr is an LV2 sampler plugin.  It's main reason to exist is to give a way for l
 - LV2 controls for pan on first 32 samples of kit (see note 1 below)
 - GTK ui that can select a kit and control gain/pan on each sample
 - Custom knob widget for GTK ui based on phatknob that is both functional and awesome looking. (see wiki for screenshot)
+- Sample grid can start in any corner of the window, to match the layout of your controller.
 
 Hopefully coming soon:
 
