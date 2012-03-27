@@ -623,7 +623,8 @@ struct slider_callback_data {
 };
 static gboolean slider_callback(gpointer data) {
   struct slider_callback_data *cbd = (struct slider_callback_data*)data;
-  gtk_range_set_value(cbd->range,cbd->val);
+  if (GTK_IS_RANGE(cbd->range))
+    gtk_range_set_value(cbd->range,cbd->val);
   free(cbd);
   return FALSE; // don't keep calling
 }
