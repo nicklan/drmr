@@ -142,6 +142,13 @@ connect_port(LV2_Handle instance,
     break;
   case DRMR_BASENOTE:
     if (data) drmr->baseNote = (float*)data;
+    break;
+  case DRMR_IGNORE_VELOCITY:
+    if (data) drmr->ignore_velocity = (float*)data;
+    break;
+  case DRMR_IGNORE_NOTE_OFF:
+    if (data) drmr->ignore_note_off = (float*)data;
+    break;
   default:
     break;
   }
@@ -182,6 +189,7 @@ static inline void layer_to_sample(drmr_sample *sample, float gain) {
 static inline void trigger_sample(DrMr *drmr, int nn, uint8_t* const data) {
   // need to mutex this to avoid getting the samples array
   // changed after the check that the midi-note is valid
+  int ignvel = (int)floorf(*(drmr->ignore_velocity));
   pthread_mutex_lock(&drmr->load_mutex);
   if (nn >= 0 && nn < drmr->num_samples) {
     if (drmr->samples[nn].layer_count > 0) {
@@ -191,7 +199,7 @@ static inline void trigger_sample(DrMr *drmr, int nn, uint8_t* const data) {
     }
     drmr->samples[nn].active = 1;
     drmr->samples[nn].offset = 0;
-    drmr->samples[nn].velocity = ((float)data[2])/VELOCITY_MAX;
+    drmr->samples[nn].velocity = ignvel?1.0:((float)data[2])/VELOCITY_MAX;
   }
   pthread_mutex_unlock(&drmr->load_mutex);
 }
@@ -216,11 +224,13 @@ static inline void untrigger_sample(DrMr *drmr, int nn) {
 #define DB_CO(g) ((g) > GAIN_MIN ? powf(10.0f, (g) * 0.05f) : 0.0f)
 
 static void run(LV2_Handle instance, uint32_t n_samples) {
-  int i,kitInt,baseNote;
+  int i,kitInt,baseNote,ignno;
   DrMr* drmr = (DrMr*)instance;
 
   kitInt = (int)floorf(*(drmr->kitReq));
   baseNote = (int)floorf(*(drmr->baseNote));
+  ignno = (int)floorf(*(drmr->ignore_note_off));
+
   if (kitInt != drmr->curKit) // requested a new kit
     pthread_cond_signal(&drmr->load_cond);
 
@@ -235,9 +245,11 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	//int channel = *data & 15;
 	switch ((*data) >> 4) {
 	case 8:
-	  nn = data[1];
-	  nn-=baseNote;
-	  untrigger_sample(drmr,nn);
+	  if (!ignno) {
+	    nn = data[1];
+	    nn-=baseNote;
+	    untrigger_sample(drmr,nn);
+	  }
 	  break;
 	case 9: {
 	  nn = data[1];

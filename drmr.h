@@ -137,6 +137,8 @@ typedef enum {
   DRMR_PAN_THIRTY,
   DRMR_PAN_THIRTYONE,
   DRMR_PAN_THIRTYTWO,
+  DRMR_IGNORE_VELOCITY,
+  DRMR_IGNORE_NOTE_OFF,
   DRMR_NUM_PORTS
 } DrMrPortIndex;
 
@@ -151,6 +153,8 @@ typedef struct {
   float** pans;
   float* kitReq;
   float* baseNote;
+  float* ignore_velocity;
+  float* ignore_note_off;
   double rate;
 
   // URIs
