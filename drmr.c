@@ -23,6 +23,7 @@
 #include "drmr_hydrogen.h"
 
 #define REQ_BUF_SIZE 10
+#define VELOCITY_MAX 127
 
 static int current_kit_changed = 0;
 
@@ -228,6 +229,21 @@ static inline void trigger_sample(DrMr *drmr, int nn, uint8_t* const data) {
     }
     drmr->samples[nn].active = 1;
     drmr->samples[nn].offset = 0;
+    drmr->samples[nn].velocity = ((float)data[2])/VELOCITY_MAX;
+  }
+  pthread_mutex_unlock(&drmr->load_mutex);
+}
+
+static inline void untrigger_sample(DrMr *drmr, int nn) {
+  pthread_mutex_lock(&drmr->load_mutex);
+  if (nn >= 0 && nn < drmr->num_samples) {
+    if (drmr->samples[nn].layer_count > 0) {
+      layer_to_sample(drmr->samples+nn,*(drmr->gains[nn]));
+      if (drmr->samples[nn].limit == 0)
+	fprintf(stderr,"Failed to find layer at: %i for %f\n",nn,*drmr->gains[nn]);
+    }
+    drmr->samples[nn].active = 0;
+    drmr->samples[nn].offset = 0;
   }
   pthread_mutex_unlock(&drmr->load_mutex);
 }
@@ -253,14 +269,17 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
   LV2_SEQUENCE_FOREACH(drmr->control_port, i) {
     LV2_Atom_Event* const ev = lv2_sequence_iter_get(i);
     if (ev->body.type == drmr->uris.midi_event) {
+      uint8_t nn;
       uint8_t* const data = (uint8_t* const)(ev + 1);
       //int channel = *data & 15;
       switch ((*data) >> 4) {
-      case 8:  // ignore note-offs for now, should probably be a setting
-	//if (drmr->cur_samp) drmr->cur_samp->active = 0;
+      case 8:
+	nn = data[1];
+	nn-=baseNote;
+	untrigger_sample(drmr,nn);
 	break;
       case 9: {
-	uint8_t nn = data[1];
+	nn = data[1];
 	nn-=baseNote;
 	trigger_sample(drmr,nn,data);
 	break;
@@ -331,8 +350,8 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	float gain = DB_CO(*(drmr->gains[i]));
 	float pan_right = ((*drmr->pans[i])+1)/2.0f;
 	float pan_left = 1-pan_right;
-	coef_right = (pan_right * (DB3SCALE * pan_right + DB3SCALEPO))*gain;
-	coef_left = (pan_left * (DB3SCALE * pan_left + DB3SCALEPO))*gain;
+	coef_right = (pan_right * (DB3SCALE * pan_right + DB3SCALEPO))*gain*cs->velocity;
+	coef_left = (pan_left * (DB3SCALE * pan_left + DB3SCALEPO))*gain*cs->velocity;
       }
       else {
 	coef_right = coef_left = 1.0f;

@@ -58,6 +58,7 @@ typedef struct {
   uint32_t offset;
   uint32_t limit;
   uint32_t layer_count;
+  float velocity;
   drmr_layer *layers;
   float* data;
 } drmr_sample;
