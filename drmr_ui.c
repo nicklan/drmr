@@ -38,6 +38,7 @@ typedef struct {
   GtkListStore *kit_store;
   GtkWidget** gain_sliders;
   GtkWidget** pan_sliders;
+  GtkWidget *velocity_checkbox, *note_off_checkbox;
   float *gain_vals,*pan_vals;
 
   gchar *bundle_path;
@@ -71,6 +72,22 @@ static gboolean pan_callback(GtkRange* range, GtkScrollType type, gdouble value,
   float pan = (float)value;
   ui->pan_vals[pidx] = pan;
   ui->write(ui->controller,pidx+DRMR_PAN_ONE,4,0,&pan);
+  return FALSE;
+}
+
+static gboolean ignore_velocity_toggled(GtkToggleButton *button, gpointer data) {
+  DrMrUi* ui = (DrMrUi*)data;
+  float val =
+    gtk_toggle_button_get_active(button)?1.0f:0.0f;
+  ui->write(ui->controller,DRMR_IGNORE_VELOCITY,4,0,&val);
+  return FALSE;
+}
+
+static gboolean ignore_note_off_toggled(GtkToggleButton *button, gpointer data) {
+  DrMrUi* ui = (DrMrUi*)data;
+  float val =
+    gtk_toggle_button_get_active(button)?1.0f:0.0f;
+  ui->write(ui->controller,DRMR_IGNORE_NOTE_OFF,4,0,&val);
   return FALSE;
 }
 
@@ -371,6 +388,9 @@ static void build_drmr_ui(DrMrUi* ui) {
   position_label = gtk_label_new("Sample Zero Position: ");
   position_combo_box = create_position_combo();
 
+  ui->velocity_checkbox = gtk_check_button_new_with_label("Ignore Velocity");
+  ui->note_off_checkbox = gtk_check_button_new_with_label("Ignore Note Off");
+
   gtk_box_pack_start(GTK_BOX(opts_hbox1),kit_label,
 		     false,false,15);
   gtk_box_pack_start(GTK_BOX(opts_hbox1),no_kit_label,
@@ -386,6 +406,10 @@ static void build_drmr_ui(DrMrUi* ui) {
 		     false,false,15);
   gtk_box_pack_start(GTK_BOX(opts_hbox2),position_combo_box,
 		     false,false,0);
+  gtk_box_pack_start(GTK_BOX(opts_hbox2),ui->velocity_checkbox,
+		     true,true,15);
+  gtk_box_pack_start(GTK_BOX(opts_hbox2),ui->note_off_checkbox,
+		     true,true,15);
 
   gtk_box_pack_start(GTK_BOX(drmr_ui_widget),gtk_hseparator_new(),
 		     false,false,5);
@@ -406,6 +430,8 @@ static void build_drmr_ui(DrMrUi* ui) {
   g_signal_connect(G_OBJECT(kit_combo_box),"changed",G_CALLBACK(kit_combobox_changed),ui);
   g_signal_connect(G_OBJECT(base_spin),"value-changed",G_CALLBACK(base_changed),ui);
   g_signal_connect(G_OBJECT(position_combo_box),"changed",G_CALLBACK(position_combobox_changed),ui);
+  g_signal_connect(G_OBJECT(ui->velocity_checkbox),"toggled",G_CALLBACK(ignore_velocity_toggled),ui);
+  g_signal_connect(G_OBJECT(ui->note_off_checkbox),"toggled",G_CALLBACK(ignore_note_off_toggled),ui);
 
   gtk_widget_show_all(drmr_ui_widget);
   gtk_widget_hide(no_kit_label);
@@ -513,6 +539,16 @@ port_event(LV2UI_Handle handle,
       gtk_spin_button_set_value(ui->base_spin,base);
       gtk_label_set_markup(ui->base_label,baseLabelBuf);
     }
+  }
+  else if (index == DRMR_IGNORE_VELOCITY) {
+    int ig = (int)(*((float*)buffer));
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ui->velocity_checkbox),
+				 ig?TRUE:FALSE);
+  }
+  else if (index == DRMR_IGNORE_NOTE_OFF) {
+    int ig = (int)(*((float*)buffer));
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ui->note_off_checkbox),
+				 ig?TRUE:FALSE);
   }
   else if (index >= DRMR_GAIN_ONE &&
 	   index <= DRMR_GAIN_THIRTYTWO) {
