@@ -152,6 +152,8 @@ typedef struct {
   LV2_URID get_state;
   LV2_URID midi_info;
   LV2_URID sample_trigger;
+  LV2_URID velocity_toggle;
+  LV2_URID note_off_toggle;
 } drmr_uris;
 
 typedef struct {
@@ -164,6 +166,8 @@ typedef struct {
   LV2_Atom_Forge forge;
 
   // params
+  bool ignore_velocity;
+  bool ignore_note_off;
   float** gains;
   float** pans;
   float* baseNote;
@@ -213,6 +217,12 @@ void map_drmr_uris(LV2_URID_Map *map,
   uris->sample_trigger =
     map->map(map->handle,
 	     DRMR_URI "#sampletrigger");
+  uris->velocity_toggle =
+    map->map(map->handle,
+	     DRMR_URI "#velocitytoggle");
+  uris->note_off_toggle =
+    map->map(map->handle,
+	     DRMR_URI "#noteofftoggle");
   uris->atom_eventTransfer = 
     map->map(map->handle, LV2_ATOM__eventTransfer);
   uris->atom_resource = 

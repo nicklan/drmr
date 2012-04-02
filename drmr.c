@@ -76,6 +76,8 @@ instantiate(const LV2_Descriptor*     descriptor,
   drmr->current_path = NULL;
   drmr->curReq = -1;
   drmr->rate = rate;
+  drmr->ignore_velocity = false;
+  drmr->ignore_note_off = false;
 
   if (pthread_mutex_init(&drmr->load_mutex, 0)) {
     fprintf(stderr, "Could not initialize load_mutex.\n");
@@ -229,7 +231,7 @@ static inline void trigger_sample(DrMr *drmr, int nn, uint8_t* const data) {
     }
     drmr->samples[nn].active = 1;
     drmr->samples[nn].offset = 0;
-    drmr->samples[nn].velocity = ((float)data[2])/VELOCITY_MAX;
+    drmr->samples[nn].velocity = drmr->ignore_velocity?1.0f:((float)data[2])/VELOCITY_MAX;
   }
   pthread_mutex_unlock(&drmr->load_mutex);
 }
@@ -274,9 +276,11 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
       //int channel = *data & 15;
       switch ((*data) >> 4) {
       case 8:
-	nn = data[1];
-	nn-=baseNote;
-	untrigger_sample(drmr,nn);
+	if (!drmr->ignore_note_off) {
+	  nn = data[1];
+	  nn-=baseNote;
+	  untrigger_sample(drmr,nn);
+	}
 	break;
       case 9: {
 	nn = data[1];
@@ -293,7 +297,14 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
       if (obj->body.otype == drmr->uris.ui_msg) {
 	const LV2_Atom* path = NULL;
 	const LV2_Atom* trigger = NULL;
-	lv2_object_get(obj, drmr->uris.kit_path, &path, drmr->uris.sample_trigger, &trigger, 0);
+	const LV2_Atom* ignvel = NULL;
+	const LV2_Atom* ignno = NULL;
+	lv2_object_get(obj,
+		       drmr->uris.kit_path, &path,
+		       drmr->uris.sample_trigger, &trigger,
+		       drmr->uris.velocity_toggle, &ignvel,
+		       drmr->uris.note_off_toggle, &ignno,
+		       0);
 	if (path) {
 	  int reqPos = (drmr->curReq+1)%REQ_BUF_SIZE;
 	  char *tmp = NULL;
@@ -312,6 +323,10 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	  mdata[2] = 0x7f;
 	  trigger_sample(drmr,si,mdata);
 	}
+	if (ignvel)
+	  drmr->ignore_velocity = ((const LV2_Atom_Bool*)ignvel)->body;
+	if (ignno)
+	  drmr->ignore_note_off = ((const LV2_Atom_Bool*)ignno)->body;
       } else if (obj->body.otype == drmr->uris.get_state) {
 	lv2_atom_forge_frame_time(&drmr->forge, 0);
 	build_state_message(drmr);

@@ -92,21 +92,50 @@ static gboolean pan_callback(GtkRange* range, GtkScrollType type, gdouble value,
   return FALSE;
 }
 
-static gboolean trigger_led_clicked(GtkWidget *widget, GdkEvent  *event, gpointer data) {
+static void send_ui_msg(DrMrUi* ui, void (*add_data)(DrMrUi* ui, gpointer data), gpointer data) {
   LV2_Atom_Forge_Frame set_frame;
-  DrMrUi* ui = (DrMrUi*)data;
-  int32_t tidx = GPOINTER_TO_INT(g_object_get_qdata(G_OBJECT(widget),ui->trigger_quark));
   uint8_t msg_buf[1024];
   lv2_atom_forge_set_buffer(&ui->forge, msg_buf, 1024);
   LV2_Atom *msg = (LV2_Atom*)lv2_atom_forge_resource
     (&ui->forge, &set_frame, 1, ui->uris.ui_msg);
-  lv2_atom_forge_property_head(&ui->forge, ui->uris.sample_trigger,0);
-  lv2_atom_forge_int(&ui->forge, tidx);
+  (*add_data)(ui,data);
   lv2_atom_forge_pop(&ui->forge,&set_frame);
   ui->write(ui->controller,DRMR_CONTROL,
 	    lv2_atom_total_size(msg),
 	    ui->uris.atom_eventTransfer,
 	    msg);
+}
+
+static void led_data(DrMrUi *ui, gpointer data) {
+  lv2_atom_forge_property_head(&ui->forge, ui->uris.sample_trigger,0);
+  lv2_atom_forge_int(&ui->forge, GPOINTER_TO_INT(data));
+}
+
+static void ignore_velocity_data(DrMrUi* ui, gpointer data) {
+  lv2_atom_forge_property_head(&ui->forge, ui->uris.velocity_toggle,0);
+  lv2_atom_forge_bool(&ui->forge, gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(data)));
+}
+
+static void ignore_note_off_data(DrMrUi* ui, gpointer data) {
+  lv2_atom_forge_property_head(&ui->forge, ui->uris.note_off_toggle,0);
+  lv2_atom_forge_bool(&ui->forge, gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(data)));
+}
+
+static gboolean trigger_led_clicked(GtkWidget *widget, GdkEvent  *event, gpointer data) {
+  DrMrUi* ui = (DrMrUi*)data;
+  send_ui_msg(ui,&led_data,g_object_get_qdata(G_OBJECT(widget),ui->trigger_quark));
+  return FALSE;
+}
+
+static gboolean ignore_velocity_toggled(GtkToggleButton *button, gpointer data) {
+  DrMrUi* ui = (DrMrUi*)data;
+  send_ui_msg(ui,&ignore_velocity_data,button);
+  return FALSE;
+}
+
+static gboolean ignore_note_off_toggled(GtkToggleButton *button, gpointer data) {
+  DrMrUi* ui = (DrMrUi*)data;
+  send_ui_msg(ui,&ignore_note_off_data,button);
   return FALSE;
 }
 
@@ -472,7 +501,8 @@ static void build_drmr_ui(DrMrUi* ui) {
   GtkWidget *drmr_ui_widget;
   GtkWidget *opts_hbox1, *opts_hbox2,
     *kit_combo_box, *kit_label, *no_kit_label,
-    *base_label, *base_spin, *position_label, *position_combo_box;
+    *base_label, *base_spin, *position_label, *position_combo_box,
+    *velocity_checkbox, *note_off_checkbox;
   GtkCellRenderer *cell_rend;
   GtkAdjustment *base_adj;
   
@@ -516,6 +546,9 @@ static void build_drmr_ui(DrMrUi* ui) {
   position_label = gtk_label_new("Sample Zero Position: ");
   position_combo_box = create_position_combo();
 
+  velocity_checkbox = gtk_check_button_new_with_label("Ignore Velocity");
+  note_off_checkbox = gtk_check_button_new_with_label("Ignore Note Off");
+
   gtk_box_pack_start(GTK_BOX(opts_hbox1),kit_label,
 		     false,false,15);
   gtk_box_pack_start(GTK_BOX(opts_hbox1),no_kit_label,
@@ -531,6 +564,11 @@ static void build_drmr_ui(DrMrUi* ui) {
 		     false,false,15);
   gtk_box_pack_start(GTK_BOX(opts_hbox2),position_combo_box,
 		     false,false,0);
+  gtk_box_pack_start(GTK_BOX(opts_hbox2),velocity_checkbox,
+		     true,true,15);
+  gtk_box_pack_start(GTK_BOX(opts_hbox2),note_off_checkbox,
+		     true,true,15);
+
   gtk_box_pack_start(GTK_BOX(drmr_ui_widget),GTK_WIDGET(ui->current_kit_label),
 		     false,false,5);
   gtk_box_pack_start(GTK_BOX(drmr_ui_widget),gtk_hseparator_new(),
@@ -552,6 +590,8 @@ static void build_drmr_ui(DrMrUi* ui) {
   g_signal_connect(G_OBJECT(kit_combo_box),"changed",G_CALLBACK(kit_combobox_changed),ui);
   g_signal_connect(G_OBJECT(base_spin),"value-changed",G_CALLBACK(base_changed),ui);
   g_signal_connect(G_OBJECT(position_combo_box),"changed",G_CALLBACK(position_combobox_changed),ui);
+  g_signal_connect(G_OBJECT(velocity_checkbox),"toggled",G_CALLBACK(ignore_velocity_toggled),ui);
+  g_signal_connect(G_OBJECT(note_off_checkbox),"toggled",G_CALLBACK(ignore_note_off_toggled),ui);
 
   gtk_widget_show_all(drmr_ui_widget);
   gtk_widget_hide(no_kit_label);
