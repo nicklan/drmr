@@ -911,8 +911,8 @@
     lv2:name "Ignore Note Off" ;
     lv2:portProperty epp:hasStrictBounds ;
     lv2:portProperty lv2:toggled ;
-    lv2:default 0.00000 ;
-    lv2:minimum 1.00000 ;
+    lv2:default 1.00000 ;
+    lv2:minimum 0.00000 ;
     lv2:maximum 1.00000 ;
   ]
 .
