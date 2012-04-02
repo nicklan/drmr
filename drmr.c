@@ -177,6 +177,22 @@ static inline void layer_to_sample(drmr_sample *sample, float gain) {
   sample->data = sample->layers[0].data;
 }
 
+static inline void trigger_sample(DrMr *drmr, int nn, uint8_t* const data) {
+  // need to mutex this to avoid getting the samples array
+  // changed after the check that the midi-note is valid
+  pthread_mutex_lock(&drmr->load_mutex);
+  if (nn >= 0 && nn < drmr->num_samples) {
+    if (drmr->samples[nn].layer_count > 0) {
+      layer_to_sample(drmr->samples+nn,*(drmr->gains[nn]));
+      if (drmr->samples[nn].limit == 0)
+	fprintf(stderr,"Failed to find layer at: %i for %f\n",nn,*drmr->gains[nn]);
+    }
+    drmr->samples[nn].active = 1;
+    drmr->samples[nn].offset = 0;
+  }
+  pthread_mutex_unlock(&drmr->load_mutex);
+}
+
 #define DB3SCALE -0.8317830986718104f
 #define DB3SCALEPO 1.8317830986718104f
 // taken from lv2 example amp plugin
@@ -206,19 +222,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	case 9: {
 	  uint8_t nn = data[1];
 	  nn-=baseNote;
-	  // need to mutex this to avoid getting the samples array
-	  // changed after the check that the midi-note is valid
-	  pthread_mutex_lock(&drmr->load_mutex); 
-	  if (nn >= 0 && nn < drmr->num_samples) {
-	    if (drmr->samples[nn].layer_count > 0) {
-	      layer_to_sample(drmr->samples+nn,*(drmr->gains[nn]));
-	      if (drmr->samples[nn].limit == 0)
-		fprintf(stderr,"Failed to find layer at: %i for %f\n",nn,*drmr->gains[nn]);
-	    }
-	    drmr->samples[nn].active = 1;
-	    drmr->samples[nn].offset = 0;
-	  }
-	  pthread_mutex_unlock(&drmr->load_mutex);
+	  trigger_sample(drmr,nn,data);
 	  break;
 	}
 	default:
