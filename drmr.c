@@ -77,7 +77,7 @@ instantiate(const LV2_Descriptor*     descriptor,
   drmr->curReq = -1;
   drmr->rate = rate;
   drmr->ignore_velocity = false;
-  drmr->ignore_note_off = false;
+  drmr->ignore_note_off = true;
 
   if (pthread_mutex_init(&drmr->load_mutex, 0)) {
     fprintf(stderr, "Could not initialize load_mutex.\n");
@@ -179,6 +179,10 @@ static inline LV2_Atom *build_state_message(DrMr *drmr) {
     lv2_atom_forge_property_head(&drmr->forge, drmr->uris.kit_path,0);
     lv2_atom_forge_string(&drmr->forge, drmr->current_path, strlen(drmr->current_path));
   }
+  lv2_atom_forge_property_head(&drmr->forge, drmr->uris.velocity_toggle,0);
+  lv2_atom_forge_bool(&drmr->forge, drmr->ignore_velocity?true:false);
+  lv2_atom_forge_property_head(&drmr->forge, drmr->uris.note_off_toggle,0);
+  lv2_atom_forge_bool(&drmr->forge, drmr->ignore_note_off?true:false);
   lv2_atom_forge_pop(&drmr->forge,&set_frame);
   return msg;
 }
@@ -410,6 +414,8 @@ void save_state(LV2_Handle                 instance,
 		const LV2_Feature *const * features) {
   DrMr *drmr = (DrMr*)instance;
   LV2_State_Map_Path* map_path = NULL;
+  int32_t flag;
+
   while(*features) {
     if (!strcmp((*features)->URI, LV2_STATE__mapPath))
       map_path = (LV2_State_Map_Path*)((*features)->data);
@@ -429,9 +435,26 @@ void save_state(LV2_Handle                 instance,
 	    mapped_path,
 	    strlen(mapped_path) + 1,
 	    drmr->uris.string_urid,
-	    LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE)) {
-    fprintf(stderr,"Store failed\n");
-  }
+	    LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE))
+    fprintf(stderr,"Store of kit path failed\n");
+
+  flag = drmr->ignore_velocity?1:0;
+  if (store(handle,
+	    drmr->uris.velocity_toggle,
+	    &flag,
+	    sizeof(int32_t),
+	    drmr->uris.bool_urid,
+	    LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE))
+    fprintf(stderr,"Store of ignore velocity failed\n");
+
+  flag = drmr->ignore_note_off?1:0;
+  if (store(handle,
+	    drmr->uris.note_off_toggle,
+	    &flag,
+	    sizeof(uint32_t),
+	    drmr->uris.bool_urid,
+	    LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE))
+    fprintf(stderr,"Store of ignore note off failed\n");
 }
 
 void restore_state(LV2_Handle                  instance,
@@ -476,6 +499,16 @@ void restore_state(LV2_Handle                  instance,
     drmr->curReq = reqPos;
     if (tmp) free(tmp);
   }
+
+  const uint32_t* ignore_velocity =
+    retrieve(handle, drmr->uris.velocity_toggle, &size, &type, &fgs);
+  if (ignore_velocity)
+    drmr->ignore_velocity = *ignore_velocity?true:false;
+
+  const uint32_t* ignore_note_off =
+    retrieve(handle, drmr->uris.note_off_toggle, &size, &type, &fgs);
+  if (ignore_note_off)
+    drmr->ignore_note_off = *ignore_note_off?true:false;
 }
 
 

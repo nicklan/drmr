@@ -149,6 +149,7 @@ typedef struct {
   LV2_URID atom_eventTransfer;
   LV2_URID atom_resource;
   LV2_URID string_urid;
+  LV2_URID bool_urid;
   LV2_URID get_state;
   LV2_URID midi_info;
   LV2_URID sample_trigger;
@@ -200,8 +201,9 @@ void map_drmr_uris(LV2_URID_Map *map,
     map->map(map->handle,
 	     "http://lv2plug.in/ns/ext/midi#MidiEvent");
   uris->string_urid =
-    map->map(map->handle,
-	     "http://lv2plug.in/ns/ext/atom#String");
+    map->map(map->handle, LV2_ATOM__String);
+  uris->bool_urid =
+    map->map(map->handle, LV2_ATOM__Bool);
   uris->ui_msg =
     map->map(map->handle,
 	     DRMR_URI "#uimsg");

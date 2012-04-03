@@ -54,6 +54,7 @@ typedef struct {
   float *gain_vals,*pan_vals;
 
   GtkWidget** notify_leds;
+  GtkWidget *velocity_checkbox, *note_off_checkbox;
 
   gchar *bundle_path;
 
@@ -501,8 +502,7 @@ static void build_drmr_ui(DrMrUi* ui) {
   GtkWidget *drmr_ui_widget;
   GtkWidget *opts_hbox1, *opts_hbox2,
     *kit_combo_box, *kit_label, *no_kit_label,
-    *base_label, *base_spin, *position_label, *position_combo_box,
-    *velocity_checkbox, *note_off_checkbox;
+    *base_label, *base_spin, *position_label, *position_combo_box;
   GtkCellRenderer *cell_rend;
   GtkAdjustment *base_adj;
   
@@ -546,8 +546,8 @@ static void build_drmr_ui(DrMrUi* ui) {
   position_label = gtk_label_new("Sample Zero Position: ");
   position_combo_box = create_position_combo();
 
-  velocity_checkbox = gtk_check_button_new_with_label("Ignore Velocity");
-  note_off_checkbox = gtk_check_button_new_with_label("Ignore Note Off");
+  ui->velocity_checkbox = gtk_check_button_new_with_label("Ignore Velocity");
+  ui->note_off_checkbox = gtk_check_button_new_with_label("Ignore Note Off");
 
   gtk_box_pack_start(GTK_BOX(opts_hbox1),kit_label,
 		     false,false,15);
@@ -564,9 +564,9 @@ static void build_drmr_ui(DrMrUi* ui) {
 		     false,false,15);
   gtk_box_pack_start(GTK_BOX(opts_hbox2),position_combo_box,
 		     false,false,0);
-  gtk_box_pack_start(GTK_BOX(opts_hbox2),velocity_checkbox,
+  gtk_box_pack_start(GTK_BOX(opts_hbox2),ui->velocity_checkbox,
 		     true,true,15);
-  gtk_box_pack_start(GTK_BOX(opts_hbox2),note_off_checkbox,
+  gtk_box_pack_start(GTK_BOX(opts_hbox2),ui->note_off_checkbox,
 		     true,true,15);
 
   gtk_box_pack_start(GTK_BOX(drmr_ui_widget),GTK_WIDGET(ui->current_kit_label),
@@ -590,8 +590,8 @@ static void build_drmr_ui(DrMrUi* ui) {
   g_signal_connect(G_OBJECT(kit_combo_box),"changed",G_CALLBACK(kit_combobox_changed),ui);
   g_signal_connect(G_OBJECT(base_spin),"value-changed",G_CALLBACK(base_changed),ui);
   g_signal_connect(G_OBJECT(position_combo_box),"changed",G_CALLBACK(position_combobox_changed),ui);
-  g_signal_connect(G_OBJECT(velocity_checkbox),"toggled",G_CALLBACK(ignore_velocity_toggled),ui);
-  g_signal_connect(G_OBJECT(note_off_checkbox),"toggled",G_CALLBACK(ignore_note_off_toggled),ui);
+  g_signal_connect(G_OBJECT(ui->velocity_checkbox),"toggled",G_CALLBACK(ignore_velocity_toggled),ui);
+  g_signal_connect(G_OBJECT(ui->note_off_checkbox),"toggled",G_CALLBACK(ignore_note_off_toggled),ui);
 
   gtk_widget_show_all(drmr_ui_widget);
   gtk_widget_hide(no_kit_label);
@@ -712,9 +712,7 @@ port_event(LV2UI_Handle handle,
 	  // both state and ui_msg are the same at the moment
 	  const LV2_Atom* path = NULL;
 	  lv2_object_get(obj, ui->uris.kit_path, &path, 0);
-	  if (!path)
-	    fprintf(stderr,"Got UI message without kit_path, ignoring\n");
-	  else {
+	  if (path) {
 	    char *kitpath = LV2_ATOM_BODY(path);
 	    char *realp = realpath(kitpath,NULL);
 	    if (!realp) {
@@ -732,7 +730,21 @@ port_event(LV2UI_Handle handle,
 	      fprintf(stderr,"Couldn't find kit %s\n",realp);
 	    free(realp);
 	  }
-	} 
+	  if (obj->body.otype == ui->uris.get_state) { // read out extra state info
+	    const LV2_Atom* ignvel = NULL;
+	    const LV2_Atom* ignno = NULL;
+	    lv2_object_get(obj,
+			   ui->uris.velocity_toggle, &ignvel,
+			   ui->uris.note_off_toggle, &ignno,
+			   0);
+	    if (ignvel)
+	      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ui->velocity_checkbox),
+					   ((const LV2_Atom_Bool*)ignvel)->body);
+	    if (ignno)
+	      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ui->note_off_checkbox),
+					   ((const LV2_Atom_Bool*)ignno)->body);
+	  }
+	}
 	else if (obj->body.otype == ui->uris.midi_info) {
 	  const LV2_Atom *midi_atom = NULL;
 	  lv2_object_get(obj, ui->uris.midi_event, &midi_atom, 0);
