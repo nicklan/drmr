@@ -54,7 +54,7 @@ typedef struct {
   float *gain_vals,*pan_vals;
 
   GtkWidget** notify_leds;
-  GtkWidget *velocity_checkbox, *note_off_checkbox;
+  GtkWidget *position_combo_box, *velocity_checkbox, *note_off_checkbox;
 
   gchar *bundle_path;
 
@@ -414,6 +414,10 @@ static void kit_combobox_changed(GtkComboBox* box, gpointer data) {
   }
 }
 
+static void position_data(DrMrUi *ui, gpointer data) {
+  lv2_atom_forge_property_head(&ui->forge, ui->uris.zero_position,0);
+  lv2_atom_forge_int(&ui->forge, GPOINTER_TO_INT(data));
+}
 static void position_combobox_changed(GtkComboBox* box, gpointer data) {
   DrMrUi* ui = (DrMrUi*)data;
   gint ss = gtk_combo_box_get_active (GTK_COMBO_BOX(box));
@@ -421,6 +425,7 @@ static void position_combobox_changed(GtkComboBox* box, gpointer data) {
     ui->startSamp = ss;
     ui->forceUpdate = true;
     kit_callback(ui);
+    send_ui_msg(ui,&position_data,GINT_TO_POINTER(ss));
   }
 }
 
@@ -502,7 +507,7 @@ static void build_drmr_ui(DrMrUi* ui) {
   GtkWidget *drmr_ui_widget;
   GtkWidget *opts_hbox1, *opts_hbox2,
     *kit_combo_box, *kit_label, *no_kit_label,
-    *base_label, *base_spin, *position_label, *position_combo_box;
+    *base_label, *base_spin, *position_label;
   GtkCellRenderer *cell_rend;
   GtkAdjustment *base_adj;
   
@@ -544,7 +549,7 @@ static void build_drmr_ui(DrMrUi* ui) {
   base_spin = gtk_spin_button_new(base_adj, 1.0, 0);
 
   position_label = gtk_label_new("Sample Zero Position: ");
-  position_combo_box = create_position_combo();
+  ui->position_combo_box = create_position_combo();
 
   ui->velocity_checkbox = gtk_check_button_new_with_label("Ignore Velocity");
   ui->note_off_checkbox = gtk_check_button_new_with_label("Ignore Note Off");
@@ -562,7 +567,7 @@ static void build_drmr_ui(DrMrUi* ui) {
 
   gtk_box_pack_start(GTK_BOX(opts_hbox2),position_label,
 		     false,false,15);
-  gtk_box_pack_start(GTK_BOX(opts_hbox2),position_combo_box,
+  gtk_box_pack_start(GTK_BOX(opts_hbox2),ui->position_combo_box,
 		     false,false,0);
   gtk_box_pack_start(GTK_BOX(opts_hbox2),ui->velocity_checkbox,
 		     true,true,15);
@@ -589,7 +594,7 @@ static void build_drmr_ui(DrMrUi* ui) {
 
   g_signal_connect(G_OBJECT(kit_combo_box),"changed",G_CALLBACK(kit_combobox_changed),ui);
   g_signal_connect(G_OBJECT(base_spin),"value-changed",G_CALLBACK(base_changed),ui);
-  g_signal_connect(G_OBJECT(position_combo_box),"changed",G_CALLBACK(position_combobox_changed),ui);
+  g_signal_connect(G_OBJECT(ui->position_combo_box),"changed",G_CALLBACK(position_combobox_changed),ui);
   g_signal_connect(G_OBJECT(ui->velocity_checkbox),"toggled",G_CALLBACK(ignore_velocity_toggled),ui);
   g_signal_connect(G_OBJECT(ui->note_off_checkbox),"toggled",G_CALLBACK(ignore_note_off_toggled),ui);
 
@@ -733,9 +738,11 @@ port_event(LV2UI_Handle handle,
 	  if (obj->body.otype == ui->uris.get_state) { // read out extra state info
 	    const LV2_Atom* ignvel = NULL;
 	    const LV2_Atom* ignno = NULL;
+	    const LV2_Atom* zerop = NULL;
 	    lv2_object_get(obj,
 			   ui->uris.velocity_toggle, &ignvel,
 			   ui->uris.note_off_toggle, &ignno,
+			   ui->uris.zero_position, &zerop,
 			   0);
 	    if (ignvel)
 	      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ui->velocity_checkbox),
@@ -743,6 +750,9 @@ port_event(LV2UI_Handle handle,
 	    if (ignno)
 	      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ui->note_off_checkbox),
 					   ((const LV2_Atom_Bool*)ignno)->body);
+	    if (zerop)
+	      gtk_combo_box_set_active(GTK_COMBO_BOX(ui->position_combo_box),
+				       ((const LV2_Atom_Int*)zerop)->body);
 	  }
 	}
 	else if (obj->body.otype == ui->uris.midi_info) {

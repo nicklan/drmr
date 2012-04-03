@@ -150,11 +150,13 @@ typedef struct {
   LV2_URID atom_resource;
   LV2_URID string_urid;
   LV2_URID bool_urid;
+  LV2_URID int_urid;
   LV2_URID get_state;
   LV2_URID midi_info;
   LV2_URID sample_trigger;
   LV2_URID velocity_toggle;
   LV2_URID note_off_toggle;
+  LV2_URID zero_position;
 } drmr_uris;
 
 typedef struct {
@@ -169,6 +171,7 @@ typedef struct {
   // params
   bool ignore_velocity;
   bool ignore_note_off;
+  int zero_position;
   float** gains;
   float** pans;
   float* baseNote;
@@ -204,6 +207,8 @@ void map_drmr_uris(LV2_URID_Map *map,
     map->map(map->handle, LV2_ATOM__String);
   uris->bool_urid =
     map->map(map->handle, LV2_ATOM__Bool);
+  uris->int_urid =
+    map->map(map->handle, LV2_ATOM__Int);
   uris->ui_msg =
     map->map(map->handle,
 	     DRMR_URI "#uimsg");
@@ -225,6 +230,9 @@ void map_drmr_uris(LV2_URID_Map *map,
   uris->note_off_toggle =
     map->map(map->handle,
 	     DRMR_URI "#noteofftoggle");
+  uris->zero_position =
+    map->map(map->handle,
+	     DRMR_URI "#zeroposition");
   uris->atom_eventTransfer = 
     map->map(map->handle, LV2_ATOM__eventTransfer);
   uris->atom_resource = 

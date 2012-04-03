@@ -79,6 +79,12 @@ instantiate(const LV2_Descriptor*     descriptor,
   drmr->ignore_velocity = false;
   drmr->ignore_note_off = true;
 
+#ifdef DRMR_UI_ZERO_SAMP
+  drmr->zero_position = DRMR_UI_ZERO_SAMP;
+#else
+  drmr->zero_position = 0;
+#endif
+
   if (pthread_mutex_init(&drmr->load_mutex, 0)) {
     fprintf(stderr, "Could not initialize load_mutex.\n");
     free(drmr);
@@ -183,6 +189,8 @@ static inline LV2_Atom *build_state_message(DrMr *drmr) {
   lv2_atom_forge_bool(&drmr->forge, drmr->ignore_velocity?true:false);
   lv2_atom_forge_property_head(&drmr->forge, drmr->uris.note_off_toggle,0);
   lv2_atom_forge_bool(&drmr->forge, drmr->ignore_note_off?true:false);
+  lv2_atom_forge_property_head(&drmr->forge, drmr->uris.zero_position,0);
+  lv2_atom_forge_int(&drmr->forge, drmr->zero_position);
   lv2_atom_forge_pop(&drmr->forge,&set_frame);
   return msg;
 }
@@ -303,11 +311,13 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	const LV2_Atom* trigger = NULL;
 	const LV2_Atom* ignvel = NULL;
 	const LV2_Atom* ignno = NULL;
+	const LV2_Atom* zerop = NULL;
 	lv2_object_get(obj,
 		       drmr->uris.kit_path, &path,
 		       drmr->uris.sample_trigger, &trigger,
 		       drmr->uris.velocity_toggle, &ignvel,
 		       drmr->uris.note_off_toggle, &ignno,
+		       drmr->uris.zero_position, &zerop,
 		       0);
 	if (path) {
 	  int reqPos = (drmr->curReq+1)%REQ_BUF_SIZE;
@@ -331,6 +341,8 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	  drmr->ignore_velocity = ((const LV2_Atom_Bool*)ignvel)->body;
 	if (ignno)
 	  drmr->ignore_note_off = ((const LV2_Atom_Bool*)ignno)->body;
+	if (zerop)
+	  drmr->zero_position = ((const LV2_Atom_Int*)zerop)->body;
       } else if (obj->body.otype == drmr->uris.get_state) {
 	lv2_atom_forge_frame_time(&drmr->forge, 0);
 	build_state_message(drmr);
@@ -455,6 +467,14 @@ void save_state(LV2_Handle                 instance,
 	    drmr->uris.bool_urid,
 	    LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE))
     fprintf(stderr,"Store of ignore note off failed\n");
+
+  if (store(handle,
+	    drmr->uris.zero_position,
+	    &drmr->zero_position,
+	    sizeof(int),
+	    drmr->uris.int_urid,
+	    LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE))
+    fprintf(stderr,"Store of sample zero position failed\n");
 }
 
 void restore_state(LV2_Handle                  instance,
@@ -509,6 +529,11 @@ void restore_state(LV2_Handle                  instance,
     retrieve(handle, drmr->uris.note_off_toggle, &size, &type, &fgs);
   if (ignore_note_off)
     drmr->ignore_note_off = *ignore_note_off?true:false;
+
+  const int* zero_position =
+    retrieve(handle, drmr->uris.zero_position, &size, &type, &fgs);
+  if (zero_position)
+    drmr->zero_position = *zero_position;
 }
 
 
