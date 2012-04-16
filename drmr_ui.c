@@ -716,7 +716,7 @@ port_event(LV2UI_Handle handle,
 	    obj->body.otype == ui->uris.ui_msg) {
 	  // both state and ui_msg are the same at the moment
 	  const LV2_Atom* path = NULL;
-	  lv2_object_get(obj, ui->uris.kit_path, &path, 0);
+	  lv2_atom_object_get(obj, ui->uris.kit_path, &path, 0);
 	  if (path) {
 	    char *kitpath = LV2_ATOM_BODY(path);
 	    char *realp = realpath(kitpath,NULL);
@@ -739,7 +739,7 @@ port_event(LV2UI_Handle handle,
 	    const LV2_Atom* ignvel = NULL;
 	    const LV2_Atom* ignno = NULL;
 	    const LV2_Atom* zerop = NULL;
-	    lv2_object_get(obj,
+	    lv2_atom_object_get(obj,
 			   ui->uris.velocity_toggle, &ignvel,
 			   ui->uris.note_off_toggle, &ignno,
 			   ui->uris.zero_position, &zerop,
@@ -757,7 +757,7 @@ port_event(LV2UI_Handle handle,
 	}
 	else if (obj->body.otype == ui->uris.midi_info) {
 	  const LV2_Atom *midi_atom = NULL;
-	  lv2_object_get(obj, ui->uris.midi_event, &midi_atom, 0);
+	  lv2_atom_object_get(obj, ui->uris.midi_event, &midi_atom, 0);
 	  if(!midi_atom) {
 	    fprintf(stderr,"Midi info with no midi data\n");
 	    return;

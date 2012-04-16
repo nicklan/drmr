@@ -280,8 +280,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
   LV2_Atom_Forge_Frame seq_frame;
   lv2_atom_forge_sequence_head(&drmr->forge, &seq_frame, 0);
 
-  LV2_SEQUENCE_FOREACH(drmr->control_port, i) {
-    LV2_Atom_Event* const ev = lv2_sequence_iter_get(i);
+  LV2_ATOM_SEQUENCE_FOREACH(drmr->control_port, ev) {
     if (ev->body.type == drmr->uris.midi_event) {
       uint8_t nn;
       uint8_t* const data = (uint8_t* const)(ev + 1);
@@ -312,13 +311,13 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	const LV2_Atom* ignvel = NULL;
 	const LV2_Atom* ignno = NULL;
 	const LV2_Atom* zerop = NULL;
-	lv2_object_get(obj,
-		       drmr->uris.kit_path, &path,
-		       drmr->uris.sample_trigger, &trigger,
-		       drmr->uris.velocity_toggle, &ignvel,
-		       drmr->uris.note_off_toggle, &ignno,
-		       drmr->uris.zero_position, &zerop,
-		       0);
+	lv2_atom_object_get(obj,
+			    drmr->uris.kit_path, &path,
+			    drmr->uris.sample_trigger, &trigger,
+			    drmr->uris.velocity_toggle, &ignvel,
+			    drmr->uris.note_off_toggle, &ignno,
+			    drmr->uris.zero_position, &zerop,
+			    0);
 	if (path) {
 	  int reqPos = (drmr->curReq+1)%REQ_BUF_SIZE;
 	  char *tmp = NULL;
@@ -419,14 +418,16 @@ static void cleanup(LV2_Handle instance) {
   free(instance);
 }
 
-void save_state(LV2_Handle                 instance,
-		LV2_State_Store_Function   store,
-		void*                      handle,
-		uint32_t                   flags,
-		const LV2_Feature *const * features) {
+static LV2_State_Status
+save_state(LV2_Handle                 instance,
+	   LV2_State_Store_Function   store,
+	   void*                      handle,
+	   uint32_t                   flags,
+	   const LV2_Feature *const * features) {
   DrMr *drmr = (DrMr*)instance;
   LV2_State_Map_Path* map_path = NULL;
   int32_t flag;
+  LV2_State_Status stat = LV2_STATE_SUCCESS;
 
   while(*features) {
     if (!strcmp((*features)->URI, LV2_STATE__mapPath))
@@ -436,52 +437,53 @@ void save_state(LV2_Handle                 instance,
 
   if (map_path == NULL) {
     fprintf(stderr,"Host does not support map_path, cannot save state\n");
-    return;
+    return LV2_STATE_ERR_NO_FEATURE;
   }
 
   char* mapped_path = map_path->abstract_path(map_path->handle,
 					      drmr->current_path);
 
-  if (store(handle,
-	    drmr->uris.kit_path,
-	    mapped_path,
-	    strlen(mapped_path) + 1,
-	    drmr->uris.string_urid,
-	    LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE))
-    fprintf(stderr,"Store of kit path failed\n");
+  stat = store(handle,
+	       drmr->uris.kit_path,
+	       mapped_path,
+	       strlen(mapped_path) + 1,
+	       drmr->uris.string_urid,
+	       LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
+  if (stat) return stat;
 
   flag = drmr->ignore_velocity?1:0;
-  if (store(handle,
-	    drmr->uris.velocity_toggle,
-	    &flag,
-	    sizeof(int32_t),
-	    drmr->uris.bool_urid,
-	    LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE))
-    fprintf(stderr,"Store of ignore velocity failed\n");
+  stat = store(handle,
+	       drmr->uris.velocity_toggle,
+	       &flag,
+	       sizeof(int32_t),
+	       drmr->uris.bool_urid,
+	       LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
+  if (stat) return stat;
 
   flag = drmr->ignore_note_off?1:0;
-  if (store(handle,
-	    drmr->uris.note_off_toggle,
-	    &flag,
-	    sizeof(uint32_t),
-	    drmr->uris.bool_urid,
-	    LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE))
-    fprintf(stderr,"Store of ignore note off failed\n");
+  stat = store(handle,
+	       drmr->uris.note_off_toggle,
+	       &flag,
+	       sizeof(uint32_t),
+	       drmr->uris.bool_urid,
+	       LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
+  if (stat) return stat;
 
-  if (store(handle,
-	    drmr->uris.zero_position,
-	    &drmr->zero_position,
-	    sizeof(int),
-	    drmr->uris.int_urid,
-	    LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE))
-    fprintf(stderr,"Store of sample zero position failed\n");
+  stat = store(handle,
+	       drmr->uris.zero_position,
+	       &drmr->zero_position,
+	       sizeof(int),
+	       drmr->uris.int_urid,
+	       LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
+  return stat;
 }
 
-void restore_state(LV2_Handle                  instance,
-		   LV2_State_Retrieve_Function retrieve,
-		   void*                       handle,
-		   uint32_t                    flags,
-		   const LV2_Feature *const *  features) {
+static LV2_State_Status 
+restore_state(LV2_Handle                  instance,
+	      LV2_State_Retrieve_Function retrieve,
+	      void*                       handle,
+	      uint32_t                    flags,
+	      const LV2_Feature *const *  features) {
   DrMr* drmr = (DrMr*)instance;
   size_t      size;
   uint32_t    type;
@@ -496,7 +498,7 @@ void restore_state(LV2_Handle                  instance,
 
   if (map_path == NULL) {
     fprintf(stderr,"Host does not support map_path, cannot restore state\n");
-    return;
+    return LV2_STATE_ERR_NO_FEATURE;
   }
 
 
@@ -505,7 +507,7 @@ void restore_state(LV2_Handle                  instance,
 
   if (!abstract_path) {
     fprintf(stderr,"Found no path in state, not restoring\n");
-    return;
+    return LV2_STATE_ERR_NO_PROPERTY;
   }
 
   char *kit_path = map_path->absolute_path(map_path->handle,abstract_path);
@@ -534,6 +536,8 @@ void restore_state(LV2_Handle                  instance,
     retrieve(handle, drmr->uris.zero_position, &size, &type, &fgs);
   if (zero_position)
     drmr->zero_position = *zero_position;
+
+  return LV2_STATE_SUCCESS;
 }
 
 
