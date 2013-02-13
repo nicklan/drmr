@@ -248,7 +248,7 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names, GtkWidget**
     gtk_box_pack_start(GTK_BOX(button_box),gtk_label_new(""),true,true,0);
 
 
-    gtk_box_pack_start(GTK_BOX(vbox),button_box,false,false,0);
+    gtk_box_pack_start(GTK_BOX(hbox),button_box,false,false,0);
     g_object_set(vbox,"border-width",5,NULL);
     gtk_container_add(GTK_CONTAINER(frame),vbox);
 
