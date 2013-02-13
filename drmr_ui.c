@@ -647,6 +647,7 @@ instantiate(const LV2UI_Descriptor*   descriptor,
   ui->trigger_quark = g_quark_from_string("drmr_trigger_quark");
   ui->gain_sliders = NULL;
   ui->pan_sliders = NULL;
+  ui->notify_leds = NULL;
 
   // store previous gain/pan vals to re-apply to sliders when we
   // change kits
