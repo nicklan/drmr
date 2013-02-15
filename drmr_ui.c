@@ -285,8 +285,10 @@ static gboolean unset_bg(gpointer data) {
 }
 
 static void sample_triggered(DrMrUi *ui, int si) {
-  gtk_image_set_from_pixbuf(GTK_IMAGE(ui->notify_leds[si]),led_on_pixbuf);
-  g_timeout_add(200,unset_bg,ui->notify_leds[si]);
+  if (ui->notify_leds && si < ui->samples) {
+    gtk_image_set_from_pixbuf(GTK_IMAGE(ui->notify_leds[si]),led_on_pixbuf);
+    g_timeout_add(200,unset_bg,ui->notify_leds[si]);
+  }
 }
 
 static const char* nstrs = "C C#D D#E F F#G G#A A#B ";
@@ -337,6 +339,7 @@ static gboolean kit_callback(gpointer data) {
       notify_leds = ui->notify_leds;
       gain_sliders = ui->gain_sliders;
       pan_sliders = ui->pan_sliders;
+      ui->samples = 0;
       ui->notify_leds = NULL;
       ui->gain_sliders = NULL;
       ui->pan_sliders = NULL;
