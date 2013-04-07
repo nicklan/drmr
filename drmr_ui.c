@@ -248,7 +248,7 @@ static void fill_sample_table(DrMrUi* ui, int samples, char** names, GtkWidget**
     gtk_box_pack_start(GTK_BOX(button_box),gtk_label_new(""),true,true,0);
 
 
-    gtk_box_pack_start(GTK_BOX(vbox),button_box,false,false,0);
+    gtk_box_pack_start(GTK_BOX(hbox),button_box,false,false,0);
     g_object_set(vbox,"border-width",5,NULL);
     gtk_container_add(GTK_CONTAINER(frame),vbox);
 
@@ -285,8 +285,10 @@ static gboolean unset_bg(gpointer data) {
 }
 
 static void sample_triggered(DrMrUi *ui, int si) {
-  gtk_image_set_from_pixbuf(GTK_IMAGE(ui->notify_leds[si]),led_on_pixbuf);
-  g_timeout_add(200,unset_bg,ui->notify_leds[si]);
+  if (ui->notify_leds && si < ui->samples) {
+    gtk_image_set_from_pixbuf(GTK_IMAGE(ui->notify_leds[si]),led_on_pixbuf);
+    g_timeout_add(200,unset_bg,ui->notify_leds[si]);
+  }
 }
 
 static const char* nstrs = "C C#D D#E F F#G G#A A#B ";
@@ -337,6 +339,7 @@ static gboolean kit_callback(gpointer data) {
       notify_leds = ui->notify_leds;
       gain_sliders = ui->gain_sliders;
       pan_sliders = ui->pan_sliders;
+      ui->samples = 0;
       ui->notify_leds = NULL;
       ui->gain_sliders = NULL;
       ui->pan_sliders = NULL;
@@ -647,6 +650,7 @@ instantiate(const LV2UI_Descriptor*   descriptor,
   ui->trigger_quark = g_quark_from_string("drmr_trigger_quark");
   ui->gain_sliders = NULL;
   ui->pan_sliders = NULL;
+  ui->notify_leds = NULL;
 
   // store previous gain/pan vals to re-apply to sliders when we
   // change kits
