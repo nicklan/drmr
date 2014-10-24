@@ -543,7 +543,7 @@ restore_state(LV2_Handle                  instance,
 
 static const void* extension_data(const char* uri) {
   static const LV2_State_Interface state_iface = { save_state, restore_state };
-  if (!strcmp(uri, LV2_STATE_URI "#Interface")) return &state_iface;
+  if (!strcmp(uri, LV2_STATE__interface)) return &state_iface;
   return NULL;
 }
 
