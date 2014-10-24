@@ -31,7 +31,7 @@ static void* load_thread(void* arg) {
   DrMr* drmr = (DrMr*)arg;
   drmr_sample *loaded_samples,*old_samples;
   int loaded_count, old_scount;
-  char *request;
+  char *request, *request_orig;
   for(;;) {
     pthread_mutex_lock(&drmr->load_mutex);
     pthread_cond_wait(&drmr->load_cond,
@@ -39,7 +39,9 @@ static void* load_thread(void* arg) {
     pthread_mutex_unlock(&drmr->load_mutex); 
     old_samples = drmr->samples;
     old_scount = drmr->num_samples;
-    request = drmr->request_buf[drmr->curReq];
+    request_orig = request = drmr->request_buf[drmr->curReq];
+    if (!strncmp(request, "file://", 7))
+      request += 7;
     loaded_samples = load_hydrogen_kit(request,drmr->rate,&loaded_count);
     if (!loaded_samples) {
       fprintf(stderr,"Failed to load kit at: %s\n",request);
@@ -57,7 +59,7 @@ static void* load_thread(void* arg) {
       pthread_mutex_unlock(&drmr->load_mutex); 
     }
     if (old_scount > 0) free_samples(old_samples,old_scount);
-    drmr->current_path = request;
+    drmr->current_path = request_orig;
     current_kit_changed = 1;
   }
   return 0;

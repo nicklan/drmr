@@ -723,6 +723,8 @@ port_event(LV2UI_Handle handle,
 	  lv2_atom_object_get(obj, ui->uris.kit_path, &path, 0);
 	  if (path) {
 	    char *kitpath = LV2_ATOM_BODY(path);
+	    if (!strncmp(kitpath, "file://", 7))
+	      kitpath += 7;
 	    char *realp = realpath(kitpath,NULL);
 	    if (!realp) {
 	      fprintf(stderr,"Passed a path I can't resolve, bailing out\n");
