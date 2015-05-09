@@ -442,16 +442,18 @@ save_state(LV2_Handle                 instance,
     return LV2_STATE_ERR_NO_FEATURE;
   }
 
-  char* mapped_path = map_path->abstract_path(map_path->handle,
-					      drmr->current_path);
+  if (drmr->current_path != NULL) {
+	char* mapped_path = map_path->abstract_path(map_path->handle,
+	                                            drmr->current_path);
 
-  stat = store(handle,
-	       drmr->uris.kit_path,
-	       mapped_path,
-	       strlen(mapped_path) + 1,
-	       drmr->uris.string_urid,
-	       LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
-  if (stat) return stat;
+	stat = store(handle,
+	             drmr->uris.kit_path,
+	             mapped_path,
+	             strlen(mapped_path) + 1,
+	             drmr->uris.string_urid,
+	             LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
+	if (stat) return stat;
+  }
 
   flag = drmr->ignore_velocity?1:0;
   stat = store(handle,
