@@ -82,6 +82,7 @@ DrMr scans the following directories for hydrogen drum kits:
 - /usr/share/drmr/drumkits/
 - ~/.hydrogen/data/drumkits/
 - ~/.drmr/drumkits/
+- ~/Library/Application Support/Hydrogen/drumkits
 
 If you want to add others, add them to the default_drumkit_locations array at the top of drmr_hydrogen.c
 
