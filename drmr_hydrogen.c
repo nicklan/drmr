@@ -45,6 +45,7 @@ static char* default_drumkit_locations[] = {
   "/usr/share/drmr/drumkits/",
   "~/.hydrogen/data/drumkits/",
   "~/.drmr/drumkits/",
+  "~/Library/Application\ Support/Hydrogen/drumkits",
   NULL
 };
 
