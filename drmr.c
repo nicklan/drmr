@@ -229,7 +229,7 @@ static inline void layer_to_sample(drmr_sample *sample, float gain) {
   sample->data = sample->layers[0].data;
 }
 
-static inline void trigger_sample(DrMr *drmr, int nn, uint8_t* const data) {
+static inline void trigger_sample(DrMr *drmr, int nn, uint8_t* const data, uint32_t offset) {
   // need to mutex this to avoid getting the samples array
   // changed after the check that the midi-note is valid
   pthread_mutex_lock(&drmr->load_mutex);
@@ -244,13 +244,13 @@ static inline void trigger_sample(DrMr *drmr, int nn, uint8_t* const data) {
       build_midi_info_message(drmr,data);
     }
     drmr->samples[nn].active = 1;
-    drmr->samples[nn].offset = 0;
+    drmr->samples[nn].offset = offset;
     drmr->samples[nn].velocity = drmr->ignore_velocity?1.0f:((float)data[2])/VELOCITY_MAX;
   }
   pthread_mutex_unlock(&drmr->load_mutex);
 }
 
-static inline void untrigger_sample(DrMr *drmr, int nn) {
+static inline void untrigger_sample(DrMr *drmr, int nn, uint32_t offset) {
   pthread_mutex_lock(&drmr->load_mutex);
   if (nn >= 0 && nn < drmr->num_samples) {
     if (drmr->samples[nn].layer_count > 0) {
@@ -259,7 +259,7 @@ static inline void untrigger_sample(DrMr *drmr, int nn) {
 	fprintf(stderr,"Failed to find layer at: %i for %f\n",nn,*drmr->gains[nn]);
     }
     drmr->samples[nn].active = 0;
-    drmr->samples[nn].offset = 0;
+    drmr->samples[nn].offset = offset;
   }
   pthread_mutex_unlock(&drmr->load_mutex);
 }
@@ -286,19 +286,20 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
     if (ev->body.type == drmr->uris.midi_event) {
       uint8_t nn;
       uint8_t* const data = (uint8_t* const)(ev + 1);
+      uint32_t offset = (ev->time.frames > 0 && ev->time.frames < n_samples) ? ev->time.frames : 0;
       //int channel = *data & 15;
       switch ((*data) >> 4) {
       case 8:
 	if (!drmr->ignore_note_off) {
 	  nn = data[1];
 	  nn-=baseNote;
-	  untrigger_sample(drmr,nn);
+	  untrigger_sample(drmr,nn,offset);
 	}
 	break;
       case 9: {
 	nn = data[1];
 	nn-=baseNote;
-	trigger_sample(drmr,nn,data);
+	trigger_sample(drmr,nn,data,offset);
 	break;
       }
       default:
@@ -333,10 +334,11 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	if (trigger) {
 	  int32_t si = ((const LV2_Atom_Int*)trigger)->body;
 	  uint8_t mdata[3];
+	  uint32_t offset = (ev->time.frames > 0 && ev->time.frames < n_samples) ? ev->time.frames : 0;
 	  mdata[0] = 0x90; // note on
 	  mdata[1] = si+baseNote;
 	  mdata[2] = 0x7f;
-	  trigger_sample(drmr,si,mdata);
+	  trigger_sample(drmr,si,mdata,offset);
 	}
 	if (ignvel)
 	  drmr->ignore_velocity = ((const LV2_Atom_Bool*)ignvel)->body;
