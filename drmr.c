@@ -304,7 +304,8 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	break;
       }
       default:
-	printf("Unhandeled status: %i\n",(*data)>>4);
+	//printf("Unhandeled status: %i\n",(*data)>>4);
+	break;
       }
     } 
     else if (ev->body.type == drmr->uris.atom_resource) {
