@@ -352,7 +352,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	build_state_message(drmr);
       }
     }
-    else printf("unrecognized event\n");
+    //else printf("unrecognized event\n");
   }
 
   if ((drmr->curReq >= 0) &&
