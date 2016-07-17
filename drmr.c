@@ -244,8 +244,9 @@ static inline void trigger_sample(DrMr *drmr, int nn, uint8_t* const data, uint3
       build_midi_info_message(drmr,data);
     }
     drmr->samples[nn].active = 1;
-    drmr->samples[nn].offset = offset;
+    drmr->samples[nn].offset = 0;
     drmr->samples[nn].velocity = drmr->ignore_velocity?1.0f:((float)data[2])/VELOCITY_MAX;
+    drmr->samples[nn].dataoffset = offset;
   }
   pthread_mutex_unlock(&drmr->load_mutex);
 }
@@ -259,7 +260,8 @@ static inline void untrigger_sample(DrMr *drmr, int nn, uint32_t offset) {
 	fprintf(stderr,"Failed to find layer at: %i for %f\n",nn,*drmr->gains[nn]);
     }
     drmr->samples[nn].active = 0;
-    drmr->samples[nn].offset = offset;
+    drmr->samples[nn].offset = 0;
+    drmr->samples[nn].dataoffset = offset;
   }
   pthread_mutex_unlock(&drmr->load_mutex);
 }
@@ -378,7 +380,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
   for (i = 0;i < drmr->num_samples;i++) {
     int pos,lim;
     drmr_sample* cs = drmr->samples+i;
-    if (cs->active && (cs->limit > 0)) {
+    if ((cs->active || cs->dataoffset) && (cs->limit > 0)) {
       float coef_right, coef_left;
       if (i < 32) {
 	float gain = DB_CO(*(drmr->gains[i]));
@@ -390,10 +392,12 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
       else {
 	coef_right = coef_left = 1.0f;
       }
+      uint32_t dataoffset = cs->dataoffset;
+      cs->dataoffset = 0;
 
       if (cs->info->channels == 1) { // play mono sample
 	lim = (n_samples < (cs->limit - cs->offset)?n_samples:(cs->limit-cs->offset));
-	for(pos = 0;pos < lim;pos++) {
+	for(pos = dataoffset; pos < lim; pos++) {
 	  drmr->left[pos]  += cs->data[cs->offset]*coef_left;
 	  drmr->right[pos] += cs->data[cs->offset]*coef_right;
 	  cs->offset++;
@@ -401,7 +405,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
       } else { // play stereo sample
 	lim = (cs->limit-cs->offset)/cs->info->channels;
 	if (lim > n_samples) lim = n_samples;
-	for (pos=0;pos<lim;pos++) {
+	for (pos = dataoffset; pos < lim; pos++) {
 	  drmr->left[pos]  += cs->data[cs->offset++]*coef_left;
 	  drmr->right[pos] += cs->data[cs->offset++]*coef_right;
 	}
