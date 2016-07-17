@@ -61,7 +61,7 @@ typedef struct {
   float velocity;
   drmr_layer *layers;
   float* data;
-  uint32_t dataoffset;
+  int dataoffset;
 } drmr_sample;
 
 // lv2 stuff

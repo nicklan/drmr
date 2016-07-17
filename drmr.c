@@ -377,7 +377,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 
   pthread_mutex_lock(&drmr->load_mutex); 
   for (i = 0;i < drmr->num_samples;i++) {
-    uint32_t pos,lim;
+    int pos,lim;
     drmr_sample* cs = drmr->samples+i;
     if ((cs->active || cs->dataoffset) && (cs->limit > 0)) {
       float coef_right, coef_left;
@@ -392,10 +392,10 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	coef_right = coef_left = 1.0f;
       }
 
-      uint32_t datastart, dataend;
+      int datastart, dataend;
       if (cs->active) {
           datastart = cs->dataoffset;
-          dataend = (uint32_t)-1;
+          dataend = n_samples;
       } else {
           datastart = 0;
           dataend = cs->dataoffset;
