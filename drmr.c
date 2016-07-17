@@ -31,7 +31,7 @@ static void* load_thread(void* arg) {
   DrMr* drmr = (DrMr*)arg;
   drmr_sample *loaded_samples,*old_samples;
   int loaded_count, old_scount;
-  char *request;
+  char *request, *request_orig;
   for(;;) {
     pthread_mutex_lock(&drmr->load_mutex);
     pthread_cond_wait(&drmr->load_cond,
@@ -39,7 +39,9 @@ static void* load_thread(void* arg) {
     pthread_mutex_unlock(&drmr->load_mutex); 
     old_samples = drmr->samples;
     old_scount = drmr->num_samples;
-    request = drmr->request_buf[drmr->curReq];
+    request_orig = request = drmr->request_buf[drmr->curReq];
+    if (!strncmp(request, "file://", 7))
+      request += 7;
     loaded_samples = load_hydrogen_kit(request,drmr->rate,&loaded_count);
     if (!loaded_samples) {
       fprintf(stderr,"Failed to load kit at: %s\n",request);
@@ -57,7 +59,7 @@ static void* load_thread(void* arg) {
       pthread_mutex_unlock(&drmr->load_mutex); 
     }
     if (old_scount > 0) free_samples(old_samples,old_scount);
-    drmr->current_path = request;
+    drmr->current_path = request_orig;
     current_kit_changed = 1;
   }
   return 0;
@@ -227,7 +229,7 @@ static inline void layer_to_sample(drmr_sample *sample, float gain) {
   sample->data = sample->layers[0].data;
 }
 
-static inline void trigger_sample(DrMr *drmr, int nn, uint8_t* const data) {
+static inline void trigger_sample(DrMr *drmr, int nn, uint8_t* const data, uint32_t offset) {
   // need to mutex this to avoid getting the samples array
   // changed after the check that the midi-note is valid
   pthread_mutex_lock(&drmr->load_mutex);
@@ -244,11 +246,12 @@ static inline void trigger_sample(DrMr *drmr, int nn, uint8_t* const data) {
     drmr->samples[nn].active = 1;
     drmr->samples[nn].offset = 0;
     drmr->samples[nn].velocity = drmr->ignore_velocity?1.0f:((float)data[2])/VELOCITY_MAX;
+    drmr->samples[nn].dataoffset = offset;
   }
   pthread_mutex_unlock(&drmr->load_mutex);
 }
 
-static inline void untrigger_sample(DrMr *drmr, int nn) {
+static inline void untrigger_sample(DrMr *drmr, int nn, uint32_t offset) {
   pthread_mutex_lock(&drmr->load_mutex);
   if (nn >= 0 && nn < drmr->num_samples) {
     if (drmr->samples[nn].layer_count > 0) {
@@ -257,7 +260,7 @@ static inline void untrigger_sample(DrMr *drmr, int nn) {
 	fprintf(stderr,"Failed to find layer at: %i for %f\n",nn,*drmr->gains[nn]);
     }
     drmr->samples[nn].active = 0;
-    drmr->samples[nn].offset = 0;
+    drmr->samples[nn].dataoffset = offset;
   }
   pthread_mutex_unlock(&drmr->load_mutex);
 }
@@ -284,23 +287,25 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
     if (ev->body.type == drmr->uris.midi_event) {
       uint8_t nn;
       uint8_t* const data = (uint8_t* const)(ev + 1);
+      uint32_t offset = (ev->time.frames > 0 && ev->time.frames < n_samples) ? ev->time.frames : 0;
       //int channel = *data & 15;
       switch ((*data) >> 4) {
       case 8:
 	if (!drmr->ignore_note_off) {
 	  nn = data[1];
 	  nn-=baseNote;
-	  untrigger_sample(drmr,nn);
+	  untrigger_sample(drmr,nn,offset);
 	}
 	break;
       case 9: {
 	nn = data[1];
 	nn-=baseNote;
-	trigger_sample(drmr,nn,data);
+	trigger_sample(drmr,nn,data,offset);
 	break;
       }
       default:
-	printf("Unhandeled status: %i\n",(*data)>>4);
+	//printf("Unhandeled status: %i\n",(*data)>>4);
+	break;
       }
     } 
     else if (ev->body.type == drmr->uris.atom_resource) {
@@ -331,10 +336,11 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	if (trigger) {
 	  int32_t si = ((const LV2_Atom_Int*)trigger)->body;
 	  uint8_t mdata[3];
+	  uint32_t offset = (ev->time.frames > 0 && ev->time.frames < n_samples) ? ev->time.frames : 0;
 	  mdata[0] = 0x90; // note on
 	  mdata[1] = si+baseNote;
 	  mdata[2] = 0x7f;
-	  trigger_sample(drmr,si,mdata);
+	  trigger_sample(drmr,si,mdata,offset);
 	}
 	if (ignvel)
 	  drmr->ignore_velocity = ((const LV2_Atom_Bool*)ignvel)->body;
@@ -347,7 +353,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	build_state_message(drmr);
       }
     }
-    else printf("unrecognized event\n");
+    //else printf("unrecognized event\n");
   }
 
   if ((drmr->curReq >= 0) &&
@@ -374,7 +380,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
   for (i = 0;i < drmr->num_samples;i++) {
     int pos,lim;
     drmr_sample* cs = drmr->samples+i;
-    if (cs->active && (cs->limit > 0)) {
+    if ((cs->active || cs->dataoffset) && (cs->limit > 0)) {
       float coef_right, coef_left;
       if (i < 32) {
 	float gain = DB_CO(*(drmr->gains[i]));
@@ -387,9 +393,19 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 	coef_right = coef_left = 1.0f;
       }
 
+      int datastart, dataend;
+      if (cs->active) {
+          datastart = cs->dataoffset;
+          dataend = n_samples;
+      } else {
+          datastart = 0;
+          dataend = cs->dataoffset;
+      }
+      cs->dataoffset = 0;
+
       if (cs->info->channels == 1) { // play mono sample
 	lim = (n_samples < (cs->limit - cs->offset)?n_samples:(cs->limit-cs->offset));
-	for(pos = 0;pos < lim;pos++) {
+	for (pos = datastart; pos < lim && pos < dataend; pos++) {
 	  drmr->left[pos]  += cs->data[cs->offset]*coef_left;
 	  drmr->right[pos] += cs->data[cs->offset]*coef_right;
 	  cs->offset++;
@@ -397,7 +413,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
       } else { // play stereo sample
 	lim = (cs->limit-cs->offset)/cs->info->channels;
 	if (lim > n_samples) lim = n_samples;
-	for (pos=0;pos<lim;pos++) {
+	for (pos = datastart; pos < lim && pos < dataend; pos++) {
 	  drmr->left[pos]  += cs->data[cs->offset++]*coef_left;
 	  drmr->right[pos] += cs->data[cs->offset++]*coef_right;
 	}
@@ -440,16 +456,18 @@ save_state(LV2_Handle                 instance,
     return LV2_STATE_ERR_NO_FEATURE;
   }
 
-  char* mapped_path = map_path->abstract_path(map_path->handle,
-					      drmr->current_path);
+  if (drmr->current_path != NULL) {
+	char* mapped_path = map_path->abstract_path(map_path->handle,
+	                                            drmr->current_path);
 
-  stat = store(handle,
-	       drmr->uris.kit_path,
-	       mapped_path,
-	       strlen(mapped_path) + 1,
-	       drmr->uris.string_urid,
-	       LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
-  if (stat) return stat;
+	stat = store(handle,
+	             drmr->uris.kit_path,
+	             mapped_path,
+	             strlen(mapped_path) + 1,
+	             drmr->uris.string_urid,
+	             LV2_STATE_IS_POD | LV2_STATE_IS_PORTABLE);
+	if (stat) return stat;
+  }
 
   flag = drmr->ignore_velocity?1:0;
   stat = store(handle,
@@ -543,7 +561,7 @@ restore_state(LV2_Handle                  instance,
 
 static const void* extension_data(const char* uri) {
   static const LV2_State_Interface state_iface = { save_state, restore_state };
-  if (!strcmp(uri, LV2_STATE_URI "#Interface")) return &state_iface;
+  if (!strcmp(uri, LV2_STATE__interface)) return &state_iface;
   return NULL;
 }
 
