@@ -565,6 +565,7 @@ drmr_sample* load_hydrogen_kit(char *path, double rate, int *num_samples) {
       samples[i].data = NULL;
     }
     samples[i].active = 0;
+    samples[i].dataoffset = 0;
     i_to_free = cur_i;
     cur_i = cur_i->next;
 

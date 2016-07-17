@@ -260,7 +260,6 @@ static inline void untrigger_sample(DrMr *drmr, int nn, uint32_t offset) {
 	fprintf(stderr,"Failed to find layer at: %i for %f\n",nn,*drmr->gains[nn]);
     }
     drmr->samples[nn].active = 0;
-    drmr->samples[nn].offset = 0;
     drmr->samples[nn].dataoffset = offset;
   }
   pthread_mutex_unlock(&drmr->load_mutex);
@@ -378,7 +377,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 
   pthread_mutex_lock(&drmr->load_mutex); 
   for (i = 0;i < drmr->num_samples;i++) {
-    int pos,lim;
+    uint32_t pos,lim;
     drmr_sample* cs = drmr->samples+i;
     if ((cs->active || cs->dataoffset) && (cs->limit > 0)) {
       float coef_right, coef_left;
@@ -392,12 +391,20 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
       else {
 	coef_right = coef_left = 1.0f;
       }
-      uint32_t dataoffset = cs->dataoffset;
+
+      uint32_t datastart, dataend;
+      if (cs->active) {
+          datastart = cs->dataoffset;
+          dataend = (uint32_t)-1;
+      } else {
+          datastart = 0;
+          dataend = cs->dataoffset;
+      }
       cs->dataoffset = 0;
 
       if (cs->info->channels == 1) { // play mono sample
 	lim = (n_samples < (cs->limit - cs->offset)?n_samples:(cs->limit-cs->offset));
-	for(pos = dataoffset; pos < lim; pos++) {
+	for (pos = datastart; pos < lim && pos < dataend; pos++) {
 	  drmr->left[pos]  += cs->data[cs->offset]*coef_left;
 	  drmr->right[pos] += cs->data[cs->offset]*coef_right;
 	  cs->offset++;
@@ -405,7 +412,7 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
       } else { // play stereo sample
 	lim = (cs->limit-cs->offset)/cs->info->channels;
 	if (lim > n_samples) lim = n_samples;
-	for (pos = dataoffset; pos < lim; pos++) {
+	for (pos = datastart; pos < lim && pos < dataend; pos++) {
 	  drmr->left[pos]  += cs->data[cs->offset++]*coef_left;
 	  drmr->right[pos] += cs->data[cs->offset++]*coef_right;
 	}
