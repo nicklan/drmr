@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 2.6)
 project (DrMr)
 
 set(LV2_INSTALL_DIR lib/lv2 CACHE PATH "Specifies where the LV2 libraries should be installed")
-set(CMAKE_C_FLAGS "-Wall")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 
 # Availble options
 option(USE_NKNOB  "Use custom NKnob widgets for gain/pan instead of Gtk sliders" ON)
