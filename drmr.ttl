@@ -19,7 +19,7 @@
   doap:license <http://usefulinc.com/doap/licenses/gpl> ;
   lv2:requiredFeature urid:map ;
   ui:ui <http://github.com/nicklan/drmr#ui> ;
-  lv2:extensionData <http://lv2plug.in/ns/ext/state#Interface> ;
+  lv2:extensionData <http://lv2plug.in/ns/ext/state#interface> ;
   lv2:port [
     a lv2:InputPort , atom:AtomPort;
     atom:bufferType atom:Sequence ;

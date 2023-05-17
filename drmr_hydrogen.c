@@ -90,6 +90,8 @@ struct hp_info {
   char in_instrument_list;
   char in_instrument;
   char in_layer;
+  char in_drumkit_component;
+
   char counted_cur_inst;
   int  cur_off;
   char cur_buf[MAX_CHAR_DATA];
@@ -106,7 +108,7 @@ startElement(void *userData, const char *name, const char **atts)
   info->cur_off = 0;
   if (info->in_info) {
     if (info->in_instrument) {
-      if (!strcmp(name,"layer") && !info->scan_only) { 
+      if (!strcmp(name,"layer") && !info->scan_only) {
 	info->in_layer = 1;
 	info->cur_layer = malloc(sizeof(struct instrument_layer));
 	memset(info->cur_layer,0,sizeof(struct instrument_layer));
@@ -121,6 +123,10 @@ startElement(void *userData, const char *name, const char **atts)
     } else {
       if (!strcmp(name,"instrumentList"))
 	info->in_instrument_list = 1;
+
+    if (! strcmp (name,"drumkitComponent"))
+              info->in_drumkit_component = 1;
+
     }
   } else {
     if (!strcmp(name,"drumkit_info"))
@@ -135,7 +141,7 @@ endElement(void *userData, const char *name)
   if (info->cur_off == MAX_CHAR_DATA) info->cur_off--;
   info->cur_buf[info->cur_off]='\0';
 
-  if (info->in_info && !info->in_instrument_list && !strcmp(name,"name"))
+  if (info->in_info && ! info->in_drumkit_component && !info->in_instrument_list && !strcmp(name,"name"))
     info->kit_info->name = strdup(info->cur_buf);
   if (info->scan_only && info->in_info && !info->in_instrument_list && !strcmp(name,"info"))
     info->kit_info->desc = strdup(info->cur_buf);
@@ -188,6 +194,9 @@ endElement(void *userData, const char *name)
     info->in_instrument = 0;
   }
   if (info->in_instrument_list && !strcmp(name,"instrumentList")) info->in_instrument_list = 0;
+    if (info->in_drumkit_component && ! strcmp (name, "drumkitComponent"))
+      info->in_drumkit_component = 0;
+
   if (info->in_info && !strcmp(name,"drumkit_info")) info->in_info = 0;
 }
 
@@ -565,6 +574,7 @@ drmr_sample* load_hydrogen_kit(char *path, double rate, int *num_samples) {
       samples[i].data = NULL;
     }
     samples[i].active = 0;
+    samples[i].dataoffset = 0;
     i_to_free = cur_i;
     cur_i = cur_i->next;
 
